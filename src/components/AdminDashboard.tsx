@@ -63,7 +63,7 @@ interface AttestationRequest {
   first_name: string;
   last_name: string;
   cin: string;
-  phone: string;
+  email: string;
   student_group: string;
   status: string;
   created_at: string;
@@ -328,7 +328,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
         "Prénom",
         "Nom",
         "CIN",
-        "Téléphone",
+        "Email",
         "Statut",
         "Date de création",
       ];
@@ -356,7 +356,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
           req.first_name,
           req.last_name,
           req.cin,
-          req.phone,
+          req.email,
           getStatusLabel(req.status),
           new Date(req.created_at).toLocaleDateString("fr-FR"),
         ]);
@@ -850,7 +850,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
                           <TableRow className="bg-gradient-to-r from-slate-50 to-blue-50 hover:bg-slate-50">
                             <TableHead className="font-semibold text-slate-700">Étudiant</TableHead>
                             <TableHead className="font-semibold text-slate-700">CIN</TableHead>
-                            <TableHead className="font-semibold text-slate-700">Téléphone</TableHead>
+                            <TableHead className="font-semibold text-slate-700">Email</TableHead>
                             <TableHead className="font-semibold text-slate-700">Statut</TableHead>
                             <TableHead className="font-semibold text-slate-700">Date</TableHead>
                             <TableHead className="font-semibold text-slate-700">Actions</TableHead>
@@ -863,7 +863,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
                                 {request.first_name} {request.last_name}
                               </TableCell>
                               <TableCell className="text-slate-600">{request.cin}</TableCell>
-                              <TableCell className="text-slate-600">{request.phone}</TableCell>
+                              <TableCell className="text-slate-600">{request.email}</TableCell>
                               <TableCell>
                                 <Badge 
                                   variant={getStatusBadgeVariant(request.status)}

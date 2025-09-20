@@ -59,7 +59,7 @@ interface FormData {
   firstName: string;
   lastName: string;
   cin: string;
-  phone: string;
+  email: string;
   studentGroup: string;
   selectedStudent: string;
   isAdmin?: boolean; // Ajout de la propriété isAdmin
@@ -71,7 +71,7 @@ export interface AttestationRequest {
   first_name: string;
   last_name: string;
   cin: string;
-  phone: string;
+  email: string;
   student_group: (typeof STUDENT_GROUPS)[number];
   status: "pending" | "approved" | "rejected";
   created_at: string;
@@ -126,10 +126,10 @@ const RequestForm = () => {
       doc.setFontSize(12);
       const headers = [
         "Nom",
-        "Prénom",
+        "Prénom", 
         "Groupe",
         "CIN",
-        "Téléphone",
+        "Email",
         "Date de demande",
       ];
       let y = 40;
@@ -148,7 +148,7 @@ const RequestForm = () => {
             request.first_name,
             request.student_group,
             request.cin,
-            request.phone,
+            request.email,
             new Date(request.created_at).toLocaleDateString(),
           ].map((item) => item?.toString() || ""),
           20,
@@ -179,7 +179,7 @@ const RequestForm = () => {
     firstName: "",
     lastName: "",
     cin: "",
-    phone: "",
+    email: "",
     studentGroup: "",
     selectedStudent: "",
   });
@@ -254,23 +254,10 @@ const RequestForm = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Format phone number to ensure it starts with +212
-  const formatPhoneNumber = (phone: string): string => {
-    // Remove any spaces, dashes, or other characters
-    const cleaned = phone.replace(/\D/g, "");
-
-    // If it already starts with 212, add the +
-    if (cleaned.startsWith("212")) {
-      return "+" + cleaned;
-    }
-
-    // If it starts with 0, replace it with +212
-    if (cleaned.startsWith("0")) {
-      return "+212" + cleaned.substring(1);
-    }
-
-    // Otherwise, add +212 to the number
-    return "+212" + cleaned;
+  // Validate email format  
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -278,8 +265,16 @@ const RequestForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Format the phone number
-      const formattedPhone = formatPhoneNumber(formData.phone);
+      // Validate email format
+      if (!validateEmail(formData.email)) {
+        toast({
+          title: "Email invalide",
+          description: "Veuillez saisir un email valide.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
       // Si la saisie est manuelle (pas de sélection dans la liste déroulante)
       if (!formData.selectedStudent) {
         // Vérifier si le nom saisi correspond à un étudiant de la liste
@@ -362,7 +357,7 @@ const RequestForm = () => {
         first_name: formData.firstName.trim().toUpperCase(),
         last_name: formData.lastName.trim().toUpperCase(),
         cin: formData.cin,
-        phone: formattedPhone,
+        email: formData.email,
         student_group: formData.studentGroup as any,
         status: "pending",
         created_at: new Date().toISOString(),
@@ -378,10 +373,10 @@ const RequestForm = () => {
         title: "✅ Demande Envoyée avec Succès",
         description:
           "Votre demande d'attestation a été enregistrée.\n\n" +
-          "• Numéro de téléphone enregistré: " +
-          formattedPhone +
+          "• Email enregistré: " +
+          formData.email +
           "\n" +
-          "• Un SMS de confirmation vous sera envoyé\n" +
+          "• Une notification par email vous sera envoyée\n" +
           "• Vous pouvez suivre l'état de votre demande avec votre CIN",
         duration: 10000,
       });
@@ -391,7 +386,7 @@ const RequestForm = () => {
         firstName: "",
         lastName: "",
         cin: "",
-        phone: "",
+        email: "",
         studentGroup: "",
         selectedStudent: "",
         isAdmin: formData.isAdmin, // Conserver la valeur de isAdmin
@@ -545,15 +540,15 @@ const RequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Numéro de téléphone</Label>
+                <Label htmlFor="email">Adresse email</Label>
                 <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
                   required
                   className="border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300 hover:border-primary/50"
-                  placeholder="Votre numéro de téléphone"
+                  placeholder="Votre adresse email"
                 />
               </div>
 

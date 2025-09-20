@@ -76,7 +76,7 @@ export const NewRequestForm: React.FC = () => {
           first_name: authenticatedStudent.first_name,
           last_name: authenticatedStudent.last_name,
           cin: authenticatedStudent.cin,
-          phone: authenticatedStudent.email,
+          email: authenticatedStudent.email,
           student_group: authenticatedStudent.student_group as any,
           status: 'pending'
         });
@@ -146,33 +146,36 @@ export const NewRequestForm: React.FC = () => {
 
   if (!authenticatedStudent) {
     return (
-      <div className="container mx-auto p-4 max-w-md">
-        <StudentAuth onAuthenticated={setAuthenticatedStudent} />
+    <div className="min-h-screen bg-gradient-to-br from-academic-light to-white flex items-center justify-center p-4">
+      <div className="container mx-auto p-4 space-y-6">
+        <NewRequestForm />
       </div>
+    </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="w-full max-w-4xl mx-auto">
-        {/* Header avec bouton de déconnexion */}
-        <div className="flex justify-between items-center mb-6">
-<h1 className="text-2xl font-bold text-white">Espace Étudiant</h1>
-          <Button 
-            onClick={handleLogout} 
-            variant="outline" 
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Déconnexion
-          </Button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-academic-light to-white p-4">
+      <div className="container mx-auto p-4 space-y-6">
+        <div className="w-full max-w-4xl mx-auto">
+          {/* Header avec bouton de déconnexion */}
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Espace Étudiant</h1>
+            <Button 
+              onClick={handleLogout} 
+              variant="outline" 
+              size="sm"
+              className="flex items-center gap-2 border-border/50 hover:border-primary hover:bg-primary/5"
+            >
+              <LogOut className="w-4 h-4" />
+              Déconnexion
+            </Button>
+          </div>
 
         {/* Student Info Card */}
-        <Card className="mb-6">
+        <Card className="mb-6 shadow-elegant border-0 bg-card/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-primary">
               <GraduationCap className="w-6 h-6" />
               Informations Personnelles
             </CardTitle>
@@ -183,25 +186,28 @@ export const NewRequestForm: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="font-medium">Groupe:</span> {authenticatedStudent.student_group}
+                <span className="font-medium text-primary">Groupe:</span> {authenticatedStudent.student_group}
               </div>
               <div>
-                <span className="font-medium">CIN:</span> {authenticatedStudent.cin}
+                <span className="font-medium text-primary">CIN:</span> {authenticatedStudent.cin}
               </div>
               <div>
-                <span className="font-medium">Email:</span> {authenticatedStudent.email}
+                <span className="font-medium text-primary">Email:</span> {authenticatedStudent.email}
               </div>
               <div>
-                <span className="font-medium">Demandes cette année:</span> {authenticatedStudent.requestCount}/3
+                <span className="font-medium text-primary">Demandes cette année:</span> 
+                <span className={`ml-1 font-bold ${authenticatedStudent.requestCount >= 3 ? 'text-destructive' : 'text-success'}`}>
+                  {authenticatedStudent.requestCount}/3
+                </span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* New Request Card */}
-        <Card className="mb-6">
+        <Card className="mb-6 shadow-elegant border-0 bg-card/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Nouvelle Demande d'Attestation</CardTitle>
+            <CardTitle className="text-primary">Nouvelle Demande d'Attestation</CardTitle>
             <CardDescription>
               {canSubmitRequest() 
                 ? `Vous pouvez encore faire ${3 - authenticatedStudent.requestCount} demande(s) cette année`
@@ -213,7 +219,7 @@ export const NewRequestForm: React.FC = () => {
             <Button
               onClick={handleSubmitRequest}
               disabled={!canSubmitRequest() || isSubmitting}
-              className="w-full"
+              className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300"
             >
               {isSubmitting ? (
                 "Envoi en cours..."
@@ -228,9 +234,9 @@ export const NewRequestForm: React.FC = () => {
         </Card>
 
         {/* Requests History Card */}
-        <Card>
+        <Card className="shadow-elegant border-0 bg-card/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Historique des Demandes</CardTitle>
+            <CardTitle className="text-primary">Historique des Demandes</CardTitle>
             <CardDescription>
               Vos demandes d'attestation et leur statut
             </CardDescription>
@@ -283,6 +289,7 @@ export const NewRequestForm: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   );
 };

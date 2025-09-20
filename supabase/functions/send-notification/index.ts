@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,23 +11,53 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-const client = new SMTPClient({
-  connection: {
-    hostname: "smtp.gmail.com",
-    port: 587,
-    tls: true,
-    auth: {
-      username: Deno.env.get("GMAIL_USER") ?? '',
-      password: Deno.env.get("GMAIL_APP_PASSWORD") ?? '',
-    },
-  },
-});
-
 interface NotificationRequest {
   requestId: string;
   status: string;
   rejectionReason?: string;
 }
+
+const sendBrevoEmail = async (
+  to: string,
+  subject: string,
+  htmlContent: string
+) => {
+  const brevoApiKey = Deno.env.get('BREVO_API_KEY');
+  
+  if (!brevoApiKey) {
+    throw new Error('BREVO_API_KEY non configuré');
+  }
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'api-key': brevoApiKey,
+    },
+    body: JSON.stringify({
+      sender: {
+        name: 'OFPPT - ISFO Casablanca',
+        email: 'noreply@isfo.ma'
+      },
+      to: [
+        {
+          email: to,
+          name: ''
+        }
+      ],
+      subject: subject,
+      htmlContent: htmlContent
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Erreur Brevo: ${error}`);
+  }
+
+  return await response.json();
+};
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -128,19 +157,13 @@ const handler = async (req: Request): Promise<Response> => {
       `;
     }
 
-    // Send email notification
-    await client.send({
-      from: Deno.env.get("GMAIL_USER") ?? '',
-      to: student.email,
-      subject,
-      content: html,
-      html: html,
-    });
+    // Send email via Brevo
+    await sendBrevoEmail(student.email, subject, html);
 
-    console.log("Notification email sent successfully");
+    console.log("Notification email sent successfully via Brevo");
 
     return new Response(
-      JSON.stringify({ message: "Notification envoyée avec succès" }),
+      JSON.stringify({ message: "Notification envoyée avec succès via Brevo" }),
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
