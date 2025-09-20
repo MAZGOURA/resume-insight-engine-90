@@ -45,7 +45,7 @@ const RequestTracking = () => {
         return;
       }
 
-      setRequest(data as AttestationRequest);
+      setRequest(data as any);
       toast({
         title: "✅ Demande trouvée",
         description: "Les détails de votre demande ont été trouvés.",

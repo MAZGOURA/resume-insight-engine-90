@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,18 +10,6 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
-
-const client = new SMTPClient({
-  connection: {
-    hostname: "smtp.gmail.com",
-    port: 587,
-    tls: true,
-    auth: {
-      username: Deno.env.get("GMAIL_USER") ?? '',
-      password: Deno.env.get("GMAIL_APP_PASSWORD") ?? '',
-    },
-  },
-});
 
 interface NotificationRequest {
   requestId: string;
@@ -90,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
 
             <p>Merci de votre confiance.</p>
           </div>
-          <div style="background: #f9fafb; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+          <div style="background: #f9fafb; padding: 15px; text-align; center; font-size: 12px; color: #666;">
             Institut Spécialisé de Formation de l'Offshoring - Casablanca<br>
             Office de la Formation Professionnelle et de la Promotion du Travail
           </div>
@@ -128,16 +115,42 @@ const handler = async (req: Request): Promise<Response> => {
       `;
     }
 
-    // Send email notification
-    await client.send({
-      from: Deno.env.get("GMAIL_USER") ?? '',
-      to: student.email,
-      subject,
-      content: html,
-      html: html,
+    // Send email using Brevo
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
+    if (!brevoApiKey) {
+      throw new Error('BREVO_API_KEY is not configured');
+    }
+
+    const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'api-key': brevoApiKey,
+      },
+      body: JSON.stringify({
+        sender: {
+          name: 'ISFO Casablanca',
+          email: 'noreply@isfo.ma'
+        },
+        to: [
+          {
+            email: student.email,
+            name: `${student.first_name} ${student.last_name}`
+          }
+        ],
+        subject: subject,
+        htmlContent: html
+      })
     });
 
-    console.log("Notification email sent successfully");
+    if (!emailResponse.ok) {
+      const errorText = await emailResponse.text();
+      console.error('Brevo API error:', errorText);
+      throw new Error(`Erreur envoi email: ${emailResponse.status} - ${errorText}`);
+    }
+
+    console.log("Notification email sent successfully via Brevo");
 
     return new Response(
       JSON.stringify({ message: "Notification envoyée avec succès" }),

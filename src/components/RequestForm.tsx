@@ -59,10 +59,10 @@ interface FormData {
   firstName: string;
   lastName: string;
   cin: string;
-  phone: string;
+  email: string;
   studentGroup: string;
   selectedStudent: string;
-  isAdmin?: boolean; // Ajout de la propriété isAdmin
+  isAdmin?: boolean;
 }
 
 // Interface pour les demandes d'attestation
@@ -71,11 +71,12 @@ export interface AttestationRequest {
   first_name: string;
   last_name: string;
   cin: string;
-  phone: string;
+  email: string;
   student_group: (typeof STUDENT_GROUPS)[number];
   status: "pending" | "approved" | "rejected";
   created_at: string;
   updated_at?: string;
+  year_requested?: number;
   rejection_reason?: string;
 }
 
@@ -148,7 +149,7 @@ const RequestForm = () => {
             request.first_name,
             request.student_group,
             request.cin,
-            request.phone,
+            request.email,
             new Date(request.created_at).toLocaleDateString(),
           ].map((item) => item?.toString() || ""),
           20,
@@ -179,7 +180,7 @@ const RequestForm = () => {
     firstName: "",
     lastName: "",
     cin: "",
-    phone: "",
+    email: "",
     studentGroup: "",
     selectedStudent: "",
   });
@@ -279,7 +280,7 @@ const RequestForm = () => {
 
     try {
       // Format the phone number
-      const formattedPhone = formatPhoneNumber(formData.phone);
+      const formattedPhone = formatPhoneNumber(formData.email);
       // Si la saisie est manuelle (pas de sélection dans la liste déroulante)
       if (!formData.selectedStudent) {
         // Vérifier si le nom saisi correspond à un étudiant de la liste
@@ -362,7 +363,7 @@ const RequestForm = () => {
         first_name: formData.firstName.trim().toUpperCase(),
         last_name: formData.lastName.trim().toUpperCase(),
         cin: formData.cin,
-        phone: formattedPhone,
+        email: formattedPhone,
         student_group: formData.studentGroup as any,
         status: "pending",
         created_at: new Date().toISOString(),
@@ -391,7 +392,7 @@ const RequestForm = () => {
         firstName: "",
         lastName: "",
         cin: "",
-        phone: "",
+        email: "",
         studentGroup: "",
         selectedStudent: "",
         isAdmin: formData.isAdmin, // Conserver la valeur de isAdmin
@@ -545,12 +546,12 @@ const RequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Numéro de téléphone</Label>
+                <Label htmlFor="email">Numéro de téléphone/Email</Label>
                 <Input
-                  id="phone"
+                  id="email"
                   type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
                   required
                   className="border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300 hover:border-primary/50"
                   placeholder="Votre numéro de téléphone"

@@ -63,11 +63,13 @@ interface AttestationRequest {
   first_name: string;
   last_name: string;
   cin: string;
-  phone: string;
+  email: string;
   student_group: string;
   status: string;
   created_at: string;
   student_id?: string;
+  year_requested: number;
+  rejection_reason?: string;
 }
 
 interface Student {
@@ -328,7 +330,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
         "Prénom",
         "Nom",
         "CIN",
-        "Téléphone",
+        "Email",
         "Statut",
         "Date de création",
       ];
@@ -356,7 +358,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
           req.first_name,
           req.last_name,
           req.cin,
-          req.phone,
+          req.email,
           getStatusLabel(req.status),
           new Date(req.created_at).toLocaleDateString("fr-FR"),
         ]);
@@ -850,77 +852,91 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
                           <TableRow className="bg-gradient-to-r from-slate-50 to-blue-50 hover:bg-slate-50">
                             <TableHead className="font-semibold text-slate-700">Étudiant</TableHead>
                             <TableHead className="font-semibold text-slate-700">CIN</TableHead>
-                            <TableHead className="font-semibold text-slate-700">Téléphone</TableHead>
+                            <TableHead className="font-semibold text-slate-700">Email</TableHead>
                             <TableHead className="font-semibold text-slate-700">Statut</TableHead>
                             <TableHead className="font-semibold text-slate-700">Date</TableHead>
                             <TableHead className="font-semibold text-slate-700">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {groupRequests.map((request) => (
-                            <TableRow key={request.id} className="hover:bg-blue-50/50 transition-colors duration-200">
-                              <TableCell className="font-medium text-slate-800">
-                                {request.first_name} {request.last_name}
-                              </TableCell>
-                              <TableCell className="text-slate-600">{request.cin}</TableCell>
-                              <TableCell className="text-slate-600">{request.phone}</TableCell>
-                              <TableCell>
-                                <Badge 
-                                  variant={getStatusBadgeVariant(request.status)}
-                                  className="font-medium"
-                                >
-                                  {getStatusLabel(request.status)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-slate-600">
-                                {new Date(request.created_at).toLocaleDateString("fr-FR")}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  {request.status === "pending" && (
-                                    <>
-                                      <Button
-                                        onClick={() => updateStatus(request.id, "approved")}
-                                        size="sm"
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        onClick={() => {
-                                          const reason = prompt("Raison du rejet (optionnel):");
-                                          updateStatus(request.id, "rejected", reason || undefined);
-                                        }}
-                                        size="sm"
-                                        variant="destructive"
-                                        className="shadow-sm hover:shadow-md transition-all duration-200"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  )}
-                                  {request.status === "approved" && (
-                                    <Button
-                                      onClick={() => generateAttestation(request)}
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 shadow-sm hover:shadow-md transition-all duration-200"
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  <Button
-                                    onClick={() => deleteRequest(request.id)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shadow-sm hover:shadow-md transition-all duration-200"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                           {groupRequests.map((request) => {
+                             // Get student request count for this year
+                             const studentEmail = request.email;
+                             const requestCount = requests.filter(r => 
+                               r.email === studentEmail && 
+                               r.year_requested === new Date().getFullYear()
+                             ).length;
+
+                             return (
+                             <TableRow key={request.id} className="hover:bg-blue-50/50 transition-colors duration-200">
+                               <TableCell className="font-medium text-slate-800">
+                                 <div className="flex flex-col">
+                                   <span>{request.first_name} {request.last_name}</span>
+                                   <span className="text-xs text-slate-500">
+                                     {requestCount}/3 demandes cette année
+                                   </span>
+                                 </div>
+                               </TableCell>
+                               <TableCell className="text-slate-600">{request.cin}</TableCell>
+                               <TableCell className="text-slate-600">{request.email}</TableCell>
+                               <TableCell>
+                                 <Badge 
+                                   variant={getStatusBadgeVariant(request.status)}
+                                   className="font-medium"
+                                 >
+                                   {getStatusLabel(request.status)}
+                                 </Badge>
+                               </TableCell>
+                               <TableCell className="text-slate-600">
+                                 {new Date(request.created_at).toLocaleDateString("fr-FR")}
+                               </TableCell>
+                               <TableCell>
+                                 <div className="flex items-center gap-2">
+                                   {request.status === "pending" && (
+                                     <>
+                                       <Button
+                                         onClick={() => updateStatus(request.id, "approved")}
+                                         size="sm"
+                                         className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                       >
+                                         <Check className="h-4 w-4" />
+                                       </Button>
+                                       <Button
+                                         onClick={() => {
+                                           const reason = prompt("Raison du rejet (optionnel):");
+                                           updateStatus(request.id, "rejected", reason || undefined);
+                                         }}
+                                         size="sm"
+                                         variant="destructive"
+                                         className="shadow-sm hover:shadow-md transition-all duration-200"
+                                       >
+                                         <X className="h-4 w-4" />
+                                       </Button>
+                                     </>
+                                   )}
+                                   {request.status === "approved" && (
+                                     <Button
+                                       onClick={() => generateAttestation(request)}
+                                       size="sm"
+                                       variant="outline"
+                                       className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 shadow-sm hover:shadow-md transition-all duration-200"
+                                     >
+                                       <Eye className="h-4 w-4" />
+                                     </Button>
+                                   )}
+                                   <Button
+                                     onClick={() => deleteRequest(request.id)}
+                                     size="sm"
+                                     variant="outline"
+                                     className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shadow-sm hover:shadow-md transition-all duration-200"
+                                   >
+                                     <Trash2 className="h-4 w-4" />
+                                   </Button>
+                                 </div>
+                               </TableCell>
+                             </TableRow>
+                           )}
+                           )}
                         </TableBody>
                       </Table>
                     </div>

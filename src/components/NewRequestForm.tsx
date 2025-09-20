@@ -76,7 +76,7 @@ export const NewRequestForm: React.FC = () => {
           first_name: authenticatedStudent.first_name,
           last_name: authenticatedStudent.last_name,
           cin: authenticatedStudent.cin,
-          phone: authenticatedStudent.email,
+          email: authenticatedStudent.email,
           student_group: authenticatedStudent.student_group as any,
           status: 'pending'
         });
