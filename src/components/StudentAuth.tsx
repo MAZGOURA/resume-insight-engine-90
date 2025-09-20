@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, GraduationCap } from 'lucide-react';
 
 interface StudentAuthProps {
   onAuthenticated: (student: any) => void;
@@ -129,105 +128,82 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({ onAuthenticated }) => 
 
   if (step === 'email') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-academic-light to-white flex items-center justify-center p-4">
-        <Card className="w-full max-w-md mx-auto shadow-elegant border-0 bg-card/80 backdrop-blur-sm">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-white" />
-            </div>
-            <CardTitle className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Authentification Étudiant
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Entrez votre email OFPPT pour recevoir un code de vérification
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email OFPPT</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="votre-matricule@ofppt-edu.ma"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300 hover:border-primary/50"
-                />
-              </div>
-              <Button 
-                type="submit" 
-                className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300" 
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle>Authentification Étudiant</CardTitle>
+          <CardDescription>
+            Entrez votre email OFPPT pour recevoir un code de vérification
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email OFPPT</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="votre-matricule@ofppt-edu.ma"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
                 disabled={isLoading}
-              >
-                {isLoading ? "Envoi en cours..." : "Envoyer le code"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Envoi en cours..." : "Envoyer le code"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-academic-light to-white flex items-center justify-center p-4">
-      <Card className="w-full max-w-md mx-auto shadow-elegant border-0 bg-card/80 backdrop-blur-sm">
-        <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center">
-            <Shield className="w-6 h-6 text-white" />
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>Code de vérification</CardTitle>
+        <CardDescription>
+          {studentInfo && (
+            <div className="mt-2 p-2 bg-muted rounded">
+              <p className="font-medium">{studentInfo.first_name} {studentInfo.last_name}</p>
+              <p className="text-sm text-muted-foreground">Groupe: {studentInfo.student_group}</p>
+            </div>
+          )}
+          Entrez le code de 6 chiffres envoyé à votre email
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleCodeSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="code">Code de vérification</Label>
+            <Input
+              id="code"
+              type="text"
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              maxLength={6}
+              required
+              disabled={isLoading}
+              className="text-center text-lg tracking-widest"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Code de vérification
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            {studentInfo && (
-              <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <p className="font-medium text-primary">{studentInfo.first_name} {studentInfo.last_name}</p>
-                <p className="text-sm text-muted-foreground">Groupe: {studentInfo.student_group}</p>
-              </div>
-            )}
-            Entrez le code de 6 chiffres envoyé à votre email
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleCodeSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="code">Code de vérification</Label>
-              <Input
-                id="code"
-                type="text"
-                placeholder="123456"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                maxLength={6}
-                required
-                disabled={isLoading}
-                className="text-center text-lg tracking-widest border-border/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300 hover:border-primary/50"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="flex-1 border-border/50 hover:border-primary hover:bg-primary/5"
-                onClick={() => setStep('email')}
-                disabled={isLoading}
-              >
-                Retour
-              </Button>
-              <Button 
-                type="submit" 
-                className="flex-1 bg-gradient-primary hover:shadow-glow transition-all duration-300" 
-                disabled={isLoading}
-              >
-                {isLoading ? "Vérification..." : "Vérifier"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          <div className="flex gap-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="flex-1"
+              onClick={() => setStep('email')}
+              disabled={isLoading}
+            >
+              Retour
+            </Button>
+            <Button type="submit" className="flex-1" disabled={isLoading}>
+              {isLoading ? "Vérification..." : "Vérifier"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
