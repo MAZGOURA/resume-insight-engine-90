@@ -101,10 +101,10 @@ export type Database = {
         Row: {
           cin: string
           created_at: string
+          email: string
           first_name: string
           id: string
           last_name: string
-          phone: string
           rejection_reason: string | null
           status: string | null
           student_group: Database["public"]["Enums"]["student_group"]
@@ -116,10 +116,10 @@ export type Database = {
         Insert: {
           cin: string
           created_at?: string
+          email: string
           first_name: string
           id?: string
           last_name: string
-          phone: string
           rejection_reason?: string | null
           status?: string | null
           student_group: Database["public"]["Enums"]["student_group"]
@@ -131,10 +131,10 @@ export type Database = {
         Update: {
           cin?: string
           created_at?: string
+          email?: string
           first_name?: string
           id?: string
           last_name?: string
-          phone?: string
           rejection_reason?: string | null
           status?: string | null
           student_group?: Database["public"]["Enums"]["student_group"]
