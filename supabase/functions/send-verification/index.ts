@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,35 +21,20 @@ const generateVerificationCode = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-const sendEmailSMTP = async (to: string, subject: string, html: string) => {
-  try {
-    const client = new SMTPClient({
-      connection: {
-        hostname: Deno.env.get("SMTP_HOST") ?? '',
-        port: parseInt(Deno.env.get("SMTP_PORT") ?? '587'),
-        tls: true,
-        auth: {
-          username: Deno.env.get("SMTP_USER") ?? '',
-          password: Deno.env.get("SMTP_PASS") ?? '',
-        },
-      },
-    });
+const resend = new Resend(Deno.env.get("RESEND_API_KEY") || "");
 
-    await client.send({
-      from: "OFPPT ISFO <" + (Deno.env.get("SMTP_USER") ?? '') + ">",
-      to: [to],
-      subject,
-      content: html,
-      html,
-    });
-
-    await client.close();
-    console.log("Email sent successfully via SMTP to:", to);
-    return { success: true };
-  } catch (error) {
-    console.error("SMTP Error:", error);
-    throw error;
+const sendEmail = async (to: string, subject: string, html: string) => {
+  if (!Deno.env.get("RESEND_API_KEY")) {
+    throw new Error("RESEND_API_KEY manquant dans les secrets Supabase");
   }
+  const response = await resend.emails.send({
+    from: "OFPPT ISFO <onboarding@resend.dev>",
+    to: [to],
+    subject,
+    html,
+  });
+  console.log("Email sent via Resend:", response?.id || "no-id");
+  return response;
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -120,7 +105,7 @@ const handler = async (req: Request): Promise<Response> => {
       </div>
     `;
 
-    await sendEmailSMTP(email, "Code de vérification - Demande d'attestation", emailHtml);
+    await sendEmail(email, "Code de vérification - Demande d'attestation", emailHtml);
 
     console.log("Verification code sent successfully to:", email);
 
