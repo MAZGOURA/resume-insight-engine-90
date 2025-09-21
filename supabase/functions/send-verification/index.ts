@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { Resend } from "npm:resend@2.0.0";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,17 +25,51 @@ const generateVerificationCode = (): string => {
 const resend = new Resend(Deno.env.get("RESEND_API_KEY") || "");
 
 const sendEmail = async (to: string, subject: string, html: string) => {
-  if (!Deno.env.get("RESEND_API_KEY")) {
-    throw new Error("RESEND_API_KEY manquant dans les secrets Supabase");
+  // Try Resend first if configured
+  try {
+    if (Deno.env.get("RESEND_API_KEY")) {
+      const fromAddr = Deno.env.get("SMTP_FROM") || "onboarding@resend.dev";
+      const response = await resend.emails.send({
+        from: `OFPPT ISFO <${fromAddr}>`,
+        to: [to],
+        subject,
+        html,
+      });
+      console.log("Email sent via Resend:", response?.id || "no-id");
+      return { success: true, provider: "resend" };
+    }
+  } catch (resendError) {
+    console.error("Resend failed:", resendError);
   }
-  const response = await resend.emails.send({
-    from: "OFPPT ISFO <onboarding@resend.dev>",
-    to: [to],
-    subject,
-    html,
-  });
-  console.log("Email sent via Resend:", response?.id || "no-id");
-  return response;
+
+  // Fallback to SMTP (e.g., Gmail)
+  try {
+    const client = new SMTPClient({
+      connection: {
+        hostname: Deno.env.get("SMTP_HOST") ?? '',
+        port: parseInt(Deno.env.get("SMTP_PORT") ?? '587'),
+        tls: true,
+        auth: {
+          username: Deno.env.get("SMTP_USER") ?? '',
+          password: Deno.env.get("SMTP_PASS") ?? '',
+        },
+      },
+    });
+
+    await client.send({
+      from: Deno.env.get("SMTP_FROM") || `OFPPT ISFO <${Deno.env.get("SMTP_USER") ?? ''}>`,
+      to: [to],
+      subject,
+      content: html,
+      html,
+    });
+    await client.close();
+    console.log("Email sent via SMTP to:", to);
+    return { success: true, provider: "smtp" };
+  } catch (smtpError) {
+    console.error("SMTP failed:", smtpError);
+    throw new Error("Echec d'envoi email (Resend et SMTP)");
+  }
 };
 
 const handler = async (req: Request): Promise<Response> => {
