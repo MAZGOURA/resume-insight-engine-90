@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,54 +13,13 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
 interface NotificationRequest {
   requestId: string;
   status: string;
   rejectionReason?: string;
 }
-
-const sendEmail = async (to: string, subject: string, html: string) => {
-  try {
-    const sendgridApiKey = Deno.env.get("SENDGRID_API_KEY");
-    if (!sendgridApiKey) {
-      throw new Error("SENDGRID_API_KEY non configuré");
-    }
-
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${sendgridApiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        personalizations: [{
-          to: [{ email: to }],
-          subject: subject
-        }],
-        from: {
-          email: Deno.env.get("SMTP_FROM") ?? "",
-          name: "OFPPT ISFO"
-        },
-        content: [{
-          type: "text/html",
-          value: html
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("SendGrid API error:", response.status, errorText);
-      throw new Error(`SendGrid API error: ${response.status}`);
-    }
-
-    console.log("Email sent via SendGrid to:", to);
-    return { success: true, provider: "sendgrid" };
-  } catch (error) {
-    console.error("SendGrid failed:", error);
-    throw new Error("Échec d'envoi email via SendGrid");
-  }
-};
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -163,10 +123,20 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Statut de notification invalide");
     }
 
-    // Send email via SendGrid
-    await sendEmail(student.email, subject, emailHtml);
+    // Send email via Resend
+    try {
+      const emailResponse = await resend.emails.send({
+        from: "OFPPT ISFO <onboarding@resend.dev>",
+        to: [student.email],
+        subject: subject,
+        html: emailHtml,
+      });
 
-    console.log("Notification sent successfully to:", student.email);
+      console.log("Notification email sent successfully via Resend:", emailResponse);
+    } catch (error: any) {
+      console.error("Error sending notification email via Resend:", error);
+      throw new Error(`Erreur lors de l'envoi de la notification: ${error.message}`);
+    }
 
     return new Response(
       JSON.stringify({ message: "Notification envoyée avec succès" }),
