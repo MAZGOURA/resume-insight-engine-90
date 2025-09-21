@@ -31,19 +31,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Processing notification:", { requestId, status });
 
-    // Get attestation request details with student info
+    // Get attestation request details - student info is already included in the request
     const { data: request, error: requestError } = await supabase
       .from('attestation_requests')
-      .select(`
-        *,
-        students (
-          first_name,
-          last_name,
-          email,
-          student_group,
-          cin
-        )
-      `)
+      .select('*')
       .eq('id', requestId)
       .single();
 
@@ -52,10 +43,29 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Demande d'attestation non trouvée");
     }
 
-    const student = request.students;
-    if (!student) {
-      throw new Error("Informations étudiant non trouvées");
+    // For requests that have student_id, try to get email from students table
+    let studentEmail = request.phone; // fallback to phone field which sometimes contains email
+    
+    if (request.student_id) {
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('email')
+        .eq('id', request.student_id)
+        .single();
+      
+      if (studentData?.email) {
+        studentEmail = studentData.email;
+      }
     }
+
+    // Use student data directly from the attestation request
+    const student = {
+      first_name: request.first_name,
+      last_name: request.last_name,
+      email: studentEmail,
+      student_group: request.student_group,
+      cin: request.cin
+    };
 
     // Prepare email content based on status
     let subject: string;
