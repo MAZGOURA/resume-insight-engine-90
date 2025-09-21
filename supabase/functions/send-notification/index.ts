@@ -74,7 +74,6 @@ const handler = async (req: Request): Promise<Response> => {
             
             <div style="background: #ffffff; padding: 15px; border-radius: 6px; margin: 15px 0;">
               <p style="margin: 0 0 10px 0; font-weight: bold; color: #059669;">Détails de votre demande :</p>
-              <p style="margin: 5px 0; color: #374151;"><strong>Type :</strong> ${request.attestation_type}</p>
               <p style="margin: 5px 0; color: #374151;"><strong>Groupe :</strong> ${student.student_group}</p>
               <p style="margin: 5px 0; color: #374151;"><strong>Date de demande :</strong> ${new Date(request.created_at).toLocaleDateString('fr-FR')}</p>
             </div>
