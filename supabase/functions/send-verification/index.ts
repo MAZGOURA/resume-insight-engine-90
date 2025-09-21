@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { Resend } from "npm:resend@2.0.0";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,14 +12,43 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-
 interface VerificationRequest {
   email: string;
 }
 
 const generateVerificationCode = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const sendEmailSMTP = async (to: string, subject: string, html: string) => {
+  try {
+    const client = new SMTPClient({
+      connection: {
+        hostname: Deno.env.get("SMTP_HOST") ?? '',
+        port: parseInt(Deno.env.get("SMTP_PORT") ?? '587'),
+        tls: true,
+        auth: {
+          username: Deno.env.get("SMTP_USER") ?? '',
+          password: Deno.env.get("SMTP_PASS") ?? '',
+        },
+      },
+    });
+
+    await client.send({
+      from: "OFPPT ISFO <" + (Deno.env.get("SMTP_USER") ?? '') + ">",
+      to: [to],
+      subject,
+      content: html,
+      html,
+    });
+
+    await client.close();
+    console.log("Email sent successfully via SMTP to:", to);
+    return { success: true };
+  } catch (error) {
+    console.error("SMTP Error:", error);
+    throw error;
+  }
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -38,6 +67,7 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (studentError || !student) {
+      console.log("Student not found for email:", email);
       return new Response(
         JSON.stringify({ error: "Email d'étudiant non trouvé dans la base de données" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -62,30 +92,36 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Erreur lors de la génération du code');
     }
 
-    // Send email
-    const emailResponse = await resend.emails.send({
-      from: "OFPPT ISFO <onboarding@resend.dev>",
-      to: [email],
-      subject: "Code de vérification - Demande d'attestation",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2563eb;">Code de vérification</h1>
-          <p>Bonjour ${student.first_name} ${student.last_name},</p>
-          <p>Votre code de vérification pour la demande d'attestation est :</p>
-          <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 20px 0;">
-            ${code}
+    // Send email via SMTP
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #2563eb; margin: 0;">Code de vérification</h1>
+        </div>
+        
+        <div style="background: #f8fafc; padding: 25px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 15px 0; font-size: 16px;">Bonjour <strong>${student.first_name} ${student.last_name}</strong>,</p>
+          <p style="margin: 0 0 20px 0; color: #64748b;">Votre code de vérification pour la demande d'attestation est :</p>
+          
+          <div style="background: #ffffff; padding: 20px; text-align: center; border-radius: 6px; border: 2px solid #e2e8f0; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 3px; color: #2563eb; font-family: monospace;">${code}</span>
           </div>
-          <p>Ce code expire dans 10 minutes.</p>
-          <p>Si vous n'avez pas fait cette demande, ignorez cet email.</p>
-          <hr>
-          <p style="font-size: 12px; color: #666;">
+          
+          <p style="margin: 20px 0 0 0; font-size: 14px; color: #dc2626;">⏰ Ce code expire dans 10 minutes.</p>
+        </div>
+        
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px;">
+          <p style="margin: 0 0 10px 0; color: #64748b; font-size: 14px;">Si vous n'avez pas fait cette demande, ignorez cet email.</p>
+          <p style="margin: 0; font-size: 12px; color: #94a3b8;">
             Institut Spécialisé de Formation de l'Offshoring - Casablanca
           </p>
         </div>
-      `,
-    });
+      </div>
+    `;
 
-    console.log("Verification email sent:", emailResponse);
+    await sendEmailSMTP(email, "Code de vérification - Demande d'attestation", emailHtml);
+
+    console.log("Verification code sent successfully to:", email);
 
     return new Response(
       JSON.stringify({ 
@@ -104,7 +140,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in send-verification function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "Erreur lors de l'envoi de l'email" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
