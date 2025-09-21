@@ -39,7 +39,7 @@ const sendEmail = async (to: string, subject: string, html: string) => {
           subject: subject
         }],
         from: {
-          email: Deno.env.get("SMTP_FROM") || "noreply@isfo.ma",
+          email: Deno.env.get("SMTP_FROM") ?? "",
           name: "OFPPT ISFO"
         },
         content: [{

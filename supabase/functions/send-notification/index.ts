@@ -37,7 +37,7 @@ const sendEmail = async (to: string, subject: string, html: string) => {
           subject: subject
         }],
         from: {
-          email: Deno.env.get("SMTP_FROM") || "noreply@isfo.ma",
+          email: Deno.env.get("SMTP_FROM") ?? "",
           name: "OFPPT ISFO"
         },
         content: [{
@@ -119,7 +119,7 @@ const handler = async (req: Request): Promise<Response> => {
               <p style="margin: 5px 0; color: #374151;"><strong>Date de demande :</strong> ${new Date(request.created_at).toLocaleDateString('fr-FR')}</p>
             </div>
             
-            <p style="margin: 15px 0 0 0; color: #166534;">Votre attestation sera disponible pour retrait prochainement. Vous serez contacté(e) dès qu'elle sera prête.</p>
+            <p style="margin: 15px 0 0 0; color: #166534;"><strong>Veuillez vous présenter à la direction pour récupérer votre attestation.</strong></p>
           </div>
           
           <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px;">
@@ -149,7 +149,7 @@ const handler = async (req: Request): Promise<Response> => {
               ${rejectionReason ? `<p style="margin: 10px 0 0 0; color: #991b1b;"><strong>Motif :</strong> ${rejectionReason}</p>` : ''}
             </div>
             
-            <p style="margin: 15px 0 0 0; color: #991b1b;">Pour plus d'informations, veuillez contacter l'administration de l'institut.</p>
+            <p style="margin: 15px 0 0 0; color: #991b1b;"><strong>Votre demande a été rejetée. Veuillez vous présenter à la direction pour plus d'informations.</strong></p>
           </div>
           
           <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px;">
