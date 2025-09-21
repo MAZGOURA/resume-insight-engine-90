@@ -110,7 +110,6 @@ export type Database = {
           student_group: Database["public"]["Enums"]["student_group"]
           student_id: string | null
           updated_at: string
-          verification_code: string | null
           year_requested: number
         }
         Insert: {
@@ -125,7 +124,6 @@ export type Database = {
           student_group: Database["public"]["Enums"]["student_group"]
           student_id?: string | null
           updated_at?: string
-          verification_code?: string | null
           year_requested?: number
         }
         Update: {
@@ -140,12 +138,18 @@ export type Database = {
           student_group?: Database["public"]["Enums"]["student_group"]
           student_id?: string | null
           updated_at?: string
-          verification_code?: string | null
           year_requested?: number
         }
         Relationships: [
           {
             foreignKeyName: "attestation_requests_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_attestation_requests_student_id"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
