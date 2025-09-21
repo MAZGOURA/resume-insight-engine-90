@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { Resend } from "npm:resend@2.0.0";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
@@ -20,27 +19,7 @@ interface NotificationRequest {
   rejectionReason?: string;
 }
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY") || "");
-
 const sendEmail = async (to: string, subject: string, html: string) => {
-  // Try Resend first if configured
-  try {
-    if (Deno.env.get("RESEND_API_KEY")) {
-      const fromAddr = Deno.env.get("SMTP_FROM") || "onboarding@resend.dev";
-      const response = await resend.emails.send({
-        from: `OFPPT ISFO <${fromAddr}>`,
-        to: [to],
-        subject,
-        html,
-      });
-      console.log("Email sent via Resend:", response?.id || "no-id");
-      return { success: true, provider: "resend" };
-    }
-  } catch (resendError) {
-    console.error("Resend failed:", resendError);
-  }
-
-  // Fallback to SMTP (e.g., Gmail)
   try {
     const client = new SMTPClient({
       connection: {
@@ -66,7 +45,7 @@ const sendEmail = async (to: string, subject: string, html: string) => {
     return { success: true, provider: "smtp" };
   } catch (smtpError) {
     console.error("SMTP failed:", smtpError);
-    throw new Error("Echec d'envoi email (Resend et SMTP)");
+    throw new Error("Echec d'envoi email via SMTP");
   }
 };
 
@@ -172,7 +151,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Statut de notification invalide");
     }
 
-    // Send email via Resend
+    // Send email via SMTP
     await sendEmail(student.email, subject, emailHtml);
 
     console.log("Notification sent successfully to:", student.email);
