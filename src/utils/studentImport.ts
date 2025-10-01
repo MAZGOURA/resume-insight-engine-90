@@ -174,6 +174,12 @@ export const studentsToImport: StudentData[] = [
   { matricule: "2006092400122", nom: "GHALLALI", prenom: "JAD", dateNaissance: "2006-09-24", cin: "BV6566", code: "DEVOWFS203", libelleLong: "DIA_DEVOWFS_TS_2A-Développement Digital option Web Full Stack (2A)-2025", telephone: "0664853360" }
 ];
 
+  { matricule: "2007021000099", nom: "EL HAROUCHI", prenom: "MOHAMED", dateNaissance: "2007-02-10", cin: "BW65281", code: "DEVOWFS203", libelleLong: "DIA_DEVOWFS_TS_2A-Développement Digital option Web Full Stack (2A)-2025", telephone: "0772001108" },
+  { matricule: "2006090300096", nom: "FAKHOUR", prenom: "OTHMAN", dateNaissance: "2006-09-03", cin: "BL182289", code: "DEVOWFS203", libelleLong: "DIA_DEVOWFS_TS_2A-Développement Digital option Web Full Stack (2A)-2025", telephone: "0698642023" },
+  { matricule: "2006050600304", nom: "ANNAOUY", prenom: "SAID", dateNaissance: "2006-05-06", cin: "BW65350", code: "ID103", libelleLong: "DIA_ID_TS_1A-Infrastructure Digitale (1A)-2025", telephone: "0635132652" },
+  { matricule: "2007072600195", nom: "AKBA", prenom: "WALID", dateNaissance: "2007-07-26", cin: "BH657697", code: "DEV104", libelleLong: "DIA_DEV_TS_1A-Développement Digital (1A)-2025", telephone: "0614517191" },
+];
+
 export async function importStudents() {
   try {
     const { data, error } = await supabase.functions.invoke('import-students', {

@@ -68,6 +68,7 @@ import {
 } from "lucide-react";
 import { AttestationGenerator } from "./AttestationGenerator";
 import { StudentManagement } from "./StudentManagement";
+import { importStudents } from "@/utils/studentImport";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import ofpptLogo from "@/assets/ofppt-logo.png";
@@ -151,6 +152,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
     request: AttestationRequest;
   } | null>(null);
   const [counterValue, setCounterValue] = useState<number>(0); // Add this state for counter value
+  const [importLoading, setImportLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
