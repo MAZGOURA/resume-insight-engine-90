@@ -14,59 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
-      admin_alerts: {
-        Row: {
-          admin_emails: string[]
-          alert_type: string
-          created_at: string | null
-          id: string
-          request_id: string | null
-          sent_at: string | null
-        }
-        Insert: {
-          admin_emails: string[]
-          alert_type?: string
-          created_at?: string | null
-          id?: string
-          request_id?: string | null
-          sent_at?: string | null
-        }
-        Update: {
-          admin_emails?: string[]
-          alert_type?: string
-          created_at?: string | null
-          id?: string
-          request_id?: string | null
-          sent_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "admin_alerts_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: false
-            referencedRelation: "attestation_requests"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      admin_users: {
+      admins: {
         Row: {
           created_at: string
-          id: string
-          password_hash: string
-          profile: Database["public"]["Enums"]["admin_profile"]
+          id: number
+          password: string
+          profile_name: string
         }
         Insert: {
           created_at?: string
-          id?: string
-          password_hash: string
-          profile: Database["public"]["Enums"]["admin_profile"]
+          id?: number
+          password: string
+          profile_name: string
         }
         Update: {
           created_at?: string
-          id?: string
-          password_hash?: string
-          profile?: Database["public"]["Enums"]["admin_profile"]
+          id?: number
+          password?: string
+          profile_name?: string
         }
         Relationships: []
       }
@@ -110,7 +75,6 @@ export type Database = {
           student_group: Database["public"]["Enums"]["student_group"]
           student_id: string | null
           updated_at: string
-          verification_code: string | null
           year_requested: number
         }
         Insert: {
@@ -125,7 +89,6 @@ export type Database = {
           student_group: Database["public"]["Enums"]["student_group"]
           student_id?: string | null
           updated_at?: string
-          verification_code?: string | null
           year_requested?: number
         }
         Update: {
@@ -140,12 +103,18 @@ export type Database = {
           student_group?: Database["public"]["Enums"]["student_group"]
           student_id?: string | null
           updated_at?: string
-          verification_code?: string | null
           year_requested?: number
         }
         Relationships: [
           {
             foreignKeyName: "attestation_requests_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_attestation_requests_student_id"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
@@ -167,6 +136,8 @@ export type Database = {
           id: string
           inscription_number: string
           last_name: string
+          password_changed: boolean | null
+          password_hash: string | null
           speciality: string
           student_group: string
           updated_at: string
@@ -184,6 +155,8 @@ export type Database = {
           id?: string
           inscription_number: string
           last_name: string
+          password_changed?: boolean | null
+          password_hash?: string | null
           speciality: string
           student_group: string
           updated_at?: string
@@ -201,36 +174,11 @@ export type Database = {
           id?: string
           inscription_number?: string
           last_name?: string
+          password_changed?: boolean | null
+          password_hash?: string | null
           speciality?: string
           student_group?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      verification_codes: {
-        Row: {
-          code: string
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          used: boolean
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          email: string
-          expires_at: string
-          id?: string
-          used?: boolean
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          used?: boolean
         }
         Relationships: []
       }
@@ -239,6 +187,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      change_student_password: {
+        Args: {
+          new_password: string
+          old_password: string
+          student_email: string
+        }
+        Returns: boolean
+      }
       get_student_request_count: {
         Args: { student_email: string }
         Returns: number
@@ -248,7 +204,7 @@ export type Database = {
         Returns: number
       }
       is_admin: {
-        Args: { user_id?: string }
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       reset_attestation_counter: {

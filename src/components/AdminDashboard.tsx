@@ -19,6 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -56,6 +64,7 @@ import {
   Calendar,
   Filter as FilterIcon,
   User,
+  RotateCcw,
 } from "lucide-react";
 import { AttestationGenerator } from "./AttestationGenerator";
 import { StudentManagement } from "./StudentManagement";
@@ -141,6 +150,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
     student: Student;
     request: AttestationRequest;
   } | null>(null);
+  const [counterValue, setCounterValue] = useState<number>(0); // Add this state for counter value
   const { toast } = useToast();
 
   useEffect(() => {
@@ -227,6 +237,16 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
 
       if (error) throw error;
       setRequests(data || []);
+
+      // Fetch the current counter value
+      const { data: counterData, error: counterError } = await supabase
+        .from("attestation_counter")
+        .select("counter")
+        .single();
+
+      if (!counterError && counterData) {
+        setCounterValue(counterData.counter);
+      }
     } catch (error) {
       toast({
         title: "Erreur",
@@ -250,12 +270,29 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
     ).length;
   };
 
+  const [emailModal, setEmailModal] = useState<{
+    isOpen: boolean;
+    email: string;
+    subject: string;
+    message: string;
+    requestId: string;
+    status: string;
+  }>({
+    isOpen: false,
+    email: "",
+    subject: "",
+    message: "",
+    requestId: "",
+    status: "",
+  });
+
   const updateStatus = async (
     id: string,
     newStatus: string,
     rejectionReason?: string
   ) => {
     try {
+      // D'abord mettre à jour le statut
       const { error } = await supabase
         .from("attestation_requests")
         .update({
@@ -266,47 +303,61 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
 
       if (error) throw error;
 
-      // Envoyer un email de notification
-      try {
-        const { error: emailError } = await supabase.functions.invoke(
-          "send-notification",
-          {
-            body: {
-              requestId: id,
-              status: newStatus,
-              rejectionReason,
-            },
-          }
-        );
+      // Trouver l'email de l'étudiant
+      const request = requests.find(r => r.id === id);
+      const studentEmail = request?.students?.email || request?.phone || "";
 
-        if (emailError) {
-          console.error("Error sending email:", emailError);
-          toast({
-            title: "Statut mis à jour",
-            description:
-              "Le statut a été mis à jour mais l'email de notification n'a pas pu être envoyé.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title:
-              newStatus === "approved"
-                ? "Demande approuvée"
-                : "Demande rejetée",
-            description: "L'étudiant a été notifié par email.",
-          });
-        }
-      } catch (emailError) {
-        console.error("Error sending notification email:", emailError);
-        toast({
-          title: "Statut mis à jour",
-          description:
-            "Le statut a été mis à jour mais l'email de notification n'a pas pu être envoyé.",
-          variant: "destructive",
-        });
+      // Préparer le message selon le statut
+      let subject = "";
+      let message = "";
+
+      if (newStatus === "approved") {
+        subject = "Attestation approuvée - OFPPT ISFO";
+        message = `Bonjour ${request?.first_name} ${request?.last_name},
+
+Excellente nouvelle ! Votre demande d'attestation a été approuvée.
+
+Détails de votre demande :
+- CIN : ${request?.cin}
+- Groupe : ${request?.student_group}
+- Date de demande : ${new Date(request?.created_at || "").toLocaleDateString('fr-FR')}
+
+Veuillez vous présenter à la direction pour récupérer votre attestation.
+
+Institut Spécialisé de Formation de l'Offshoring - Casablanca`;
+      } else if (newStatus === "rejected") {
+        subject = "Demande d'attestation rejetée - OFPPT ISFO";
+        message = `Bonjour ${request?.first_name} ${request?.last_name},
+
+Nous regrettons de vous informer que votre demande d'attestation a été rejetée.
+
+Détails de votre demande :
+- CIN : ${request?.cin}
+- Groupe : ${request?.student_group}
+- Date de demande : ${new Date(request?.created_at || "").toLocaleDateString('fr-FR')}
+${rejectionReason ? `- Motif : ${rejectionReason}` : ''}
+
+Veuillez vous présenter à la direction pour plus d'informations.
+
+Institut Spécialisé de Formation de l'Offshoring - Casablanca`;
       }
 
+      // Ouvrir la modale avec l'email pré-rempli
+      setEmailModal({
+        isOpen: true,
+        email: studentEmail,
+        subject,
+        message,
+        requestId: id,
+        status: newStatus,
+      });
+
       await fetchRequests();
+      
+      toast({
+        title: "Statut mis à jour",
+        description: "Vous pouvez maintenant envoyer l'email manuellement.",
+      });
     } catch (error) {
       toast({
         title: "Erreur",
@@ -314,6 +365,27 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
         variant: "destructive",
       });
     }
+  };
+
+  const copyEmailToClipboard = () => {
+    const emailContent = `À: ${emailModal.email}
+Objet: ${emailModal.subject}
+
+${emailModal.message}`;
+    
+    navigator.clipboard.writeText(emailContent);
+    toast({
+      title: "Email copié",
+      description: "Le contenu de l'email a été copié dans le presse-papiers.",
+    });
+  };
+
+  const openEmailClient = () => {
+    const subject = encodeURIComponent(emailModal.subject);
+    const body = encodeURIComponent(emailModal.message);
+    const to = encodeURIComponent(emailModal.email);
+    
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`);
   };
 
   const deleteRequest = async (id: string) => {
@@ -638,6 +710,59 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
   // Add state for student management page
   const [showStudentManagement, setShowStudentManagement] = useState(false);
 
+  // Add function to reset the attestation counter
+  const resetAttestationCounter = async () => {
+    try {
+      // Since we're not using Supabase Auth, we need to bypass the is_admin check
+      // by directly updating the counter table instead of using the RPC function
+      const { data, error } = await supabase
+        .from("attestation_counter")
+        .update({
+          counter: 0,
+          last_reset_date: new Date().toISOString(),
+          last_reset_by: adminProfile,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1);
+
+      // If update failed because no row exists, insert a new row
+      if (error && error.message.includes("no rows")) {
+        const { data: insertData, error: insertError } = await supabase
+          .from("attestation_counter")
+          .insert({
+            id: 1,
+            counter: 0,
+            last_reset_date: new Date().toISOString(),
+            last_reset_by: adminProfile,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (insertError) throw insertError;
+      } else if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Succès",
+        description: "Le compteur d'attestations a été réinitialisé à 0.",
+      });
+
+      // Update the counter value state
+      setCounterValue(0);
+
+      // Refresh the requests to update any related data
+      fetchRequests();
+    } catch (error) {
+      console.error("Reset counter error:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de réinitialiser le compteur d'attestations.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (showStudentManagement) {
     return (
       <StudentManagement
@@ -756,7 +881,7 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistics Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-blue-100">
@@ -841,6 +966,31 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
                     )
                   : 0}
                 % du total
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Add Reset Counter Card */}
+          <Card className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-purple-100">
+                Réinitialiser Compteur
+              </CardTitle>
+              <RotateCcw className="h-5 w-5 text-purple-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold mb-2 text-center">
+                {counterValue}
+              </div>
+              <Button
+                onClick={resetAttestationCounter}
+                className="w-full bg-white text-purple-600 hover:bg-purple-50 font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-200"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Réinitialiser
+              </Button>
+              <p className="text-xs text-purple-100 mt-2 text-center">
+                Remettre le compteur à zéro
               </p>
             </CardContent>
           </Card>
@@ -1263,6 +1413,63 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modale d'envoi d'email */}
+      <Dialog open={emailModal.isOpen} onOpenChange={(open) => setEmailModal(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Envoyer un email à l'étudiant</DialogTitle>
+            <DialogDescription>
+              Copiez le contenu ci-dessous ou utilisez votre client email.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email-to">À :</Label>
+              <Input id="email-to" value={emailModal.email} disabled />
+            </div>
+            
+            <div>
+              <Label htmlFor="email-subject">Objet :</Label>
+              <Input 
+                id="email-subject" 
+                value={emailModal.subject} 
+                onChange={(e) => setEmailModal(prev => ({ ...prev, subject: e.target.value }))}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="email-message">Message :</Label>
+              <Textarea 
+                id="email-message" 
+                rows={12}
+                value={emailModal.message}
+                onChange={(e) => setEmailModal(prev => ({ ...prev, message: e.target.value }))}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={copyEmailToClipboard}
+              className="flex items-center gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Copier le contenu
+            </Button>
+            <Button 
+              onClick={openEmailClient}
+              className="flex items-center gap-2"
+            >
+              <Mail className="h-4 w-4" />
+              Ouvrir le client email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

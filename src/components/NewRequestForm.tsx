@@ -10,6 +10,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { StudentAuth } from "./StudentAuth";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import {
   GraduationCap,
   Send,
@@ -25,6 +26,7 @@ import {
   CalendarClock,
   AlertCircle,
   Info,
+  Key,
 } from "lucide-react";
 import {
   Tooltip,
@@ -69,11 +71,16 @@ interface Student {
   requestCount: number;
 }
 
-interface AttestationRequest {
+export interface AttestationRequest {
   id: string;
   status: string;
   created_at: string;
   rejection_reason?: string;
+  first_name: string;
+  last_name: string;
+  cin: string;
+  phone?: string;
+  attestation_type?: string;
   student_group:
     | "ID101"
     | "ID102"
@@ -108,6 +115,7 @@ export const NewRequestForm: React.FC = () => {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const { toast } = useToast();
 
@@ -124,7 +132,7 @@ export const NewRequestForm: React.FC = () => {
       const { data, error } = await supabase
         .from("attestation_requests")
         .select("*")
-        .eq("cin", authenticatedStudent.cin)
+        .eq("student_id", authenticatedStudent.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -145,6 +153,7 @@ export const NewRequestForm: React.FC = () => {
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from("attestation_requests").insert({
+        student_id: authenticatedStudent.id,
         first_name: authenticatedStudent.first_name,
         last_name: authenticatedStudent.last_name,
         cin: authenticatedStudent.cin,
@@ -178,7 +187,8 @@ export const NewRequestForm: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setAuthenticatedStudent(null);
     setStudentRequests([]);
     toast({
@@ -238,6 +248,13 @@ export const NewRequestForm: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
+      <ChangePasswordDialog
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        studentEmail={authenticatedStudent.email}
+        currentPassword=""
+      />
+      
       <div className="w-full max-w-4xl mx-auto">
         {/* Header avec bouton de déconnexion */}
         <div className="flex justify-between items-center mb-6">
@@ -359,6 +376,18 @@ export const NewRequestForm: React.FC = () => {
                     </p>
                   </div>
                 </div>
+              </div>
+              
+              {/* Change Password Button */}
+              <div className="mt-6">
+                <Button
+                  onClick={() => setShowChangePassword(true)}
+                  variant="outline"
+                  className="w-full sm:w-auto flex items-center gap-2 border-blue-200 hover:bg-blue-50 text-blue-700"
+                >
+                  <Key className="w-4 h-4" />
+                  Changer mon mot de passe
+                </Button>
               </div>
             </div>
 

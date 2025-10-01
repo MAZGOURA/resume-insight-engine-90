@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AttestationRequest } from "./NewRequestForm";
+import type { AttestationRequest } from "./RequestForm";
 import {
   Card,
   CardContent,

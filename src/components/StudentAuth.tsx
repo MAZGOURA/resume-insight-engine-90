@@ -11,7 +11,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Mail, Shield, User, ArrowRight, ArrowLeft, Key } from "lucide-react";
+import { Mail, User, ArrowRight, Key, AlertCircle, Info } from "lucide-react";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 
 interface StudentInfo {
   id: string;
@@ -55,14 +56,15 @@ interface StudentAuthProps {
 export const StudentAuth: React.FC<StudentAuthProps> = ({
   onAuthenticated,
 }) => {
-  const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [authenticatedStudent, setAuthenticatedStudent] = useState<any>(null);
   const { toast } = useToast();
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate email domain
@@ -79,96 +81,50 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "send-verification",
-        {
-          body: { email },
-        }
-      );
+      // Authentification directe avec la table students (pas Supabase Auth)
+      const { data: studentData, error: studentError } = await supabase
+        .from("students")
+        .select("*")
+        .eq("email", email)
+        .eq("password_hash", password)
+        .single();
 
-      if (error) throw error;
-
-      setStudentInfo(data.student);
-      setStep("code");
-      toast({
-        title: "Code envoyé",
-        description: "Un code de vérification a été envoyé à votre email",
-      });
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description:
-          (error as Error).message || "Erreur lors de l'envoi du code",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      // Call the verify-code edge function
-      const { data: verifyResponse, error: verifyError } =
-        await supabase.functions.invoke("verify-code", {
-          body: {
-            email: email,
-            code: code.trim(),
-          },
+      if (studentError || !studentData) {
+        toast({
+          title: "Erreur de connexion",
+          description: "Email ou mot de passe incorrect",
+          variant: "destructive",
         });
-
-      if (verifyError || !verifyResponse.success) {
-        throw new Error(verifyResponse?.error || "Code invalide ou expiré");
-      }
-
-      const studentData = verifyResponse.student;
-
-      // Sign in the user with Supabase Auth
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: code.trim(), // Use the verification code as password
-      });
-
-      if (signInError) {
-        console.error("Sign in error:", signInError);
-        // If sign in fails, try to sign up
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: email,
-          password: code.trim(),
-          options: {
-            emailRedirectTo: undefined,
-          },
-        });
-
-        if (signUpError) {
-          console.error("Sign up error:", signUpError);
-        }
+        return;
       }
 
       // Get student's request count for the current year
-      const requestCount = await supabase.rpc("get_student_request_count", {
+      const { data: requestCount } = await supabase.rpc("get_student_request_count", {
         student_email: email,
       });
 
       const studentWithRequestCount = {
         ...studentData,
-        requestCount: requestCount.data || 0,
+        student_group: studentData.student_group as any,
+        requestCount: requestCount || 0,
       };
 
       toast({
-        title: "Authentification réussie",
+        title: "Connexion réussie",
         description: `Bienvenue ${studentData.first_name} ${studentData.last_name}`,
       });
 
-      onAuthenticated(studentWithRequestCount);
+      // Si le mot de passe n'a pas été changé, afficher le dialogue
+      if (!studentData.password_changed) {
+        setAuthenticatedStudent(studentWithRequestCount);
+        setShowChangePassword(true);
+      } else {
+        onAuthenticated(studentWithRequestCount);
+      }
     } catch (error) {
-      console.error("Verification error:", error);
       toast({
         title: "Erreur",
-        description: (error as Error).message || "Code invalide ou expiré",
+        description: (error as Error).message || "Erreur lors de la connexion",
         variant: "destructive",
       });
     } finally {
@@ -176,142 +132,135 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({
     }
   };
 
-  if (step === "email") {
-    return (
-      <Card className="w-full max-w-md mx-auto bg-gradient-to-br from-white to-slate-50 border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-white/20 p-3 rounded-full">
-              <Mail className="w-8 h-8" />
-            </div>
-          </div>
-          <CardTitle className="text-center text-2xl font-bold">
-            Authentification Étudiant
-          </CardTitle>
-          <CardDescription className="text-center text-blue-100 mt-2">
-            Entrez votre email OFPPT pour recevoir un code de vérification
-          </CardDescription>
-        </div>
-        <CardContent className="p-6">
-          <form onSubmit={handleEmailSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700 font-medium">
-                Email OFPPT
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="votre-matricule@ofppt-edu.ma"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="pl-10 py-6 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl text-slate-800"
-                />
-              </div>
-            </div>
-            <Button
-              type="submit"
-              className="w-full py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Envoi en cours...
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  Envoyer le code
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </div>
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleCloseChangePassword = () => {
+    setShowChangePassword(false);
+    if (authenticatedStudent) {
+      onAuthenticated(authenticatedStudent);
+    }
+  };
 
   return (
-    <Card className="w-full max-w-md mx-auto bg-gradient-to-br from-white to-slate-50 border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
+    <>
+      <ChangePasswordDialog
+        isOpen={showChangePassword}
+        onClose={handleCloseChangePassword}
+        studentEmail={email}
+        currentPassword={password}
+      />
+      
+      {/* Forgot Password Dialog */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+                Mot de passe oublié
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-slate-700">
+                Si vous avez oublié votre mot de passe, veuillez vous rendre à la direction de l'établissement pour le réinitialiser.
+              </p>
+              <p className="text-sm text-slate-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <Info className="w-4 h-4 inline mr-2" />
+                Apportez votre carte d'étudiant et votre pièce d'identité.
+              </p>
+              <Button
+                onClick={() => setShowForgotPassword(false)}
+                className="w-full"
+              >
+                J'ai compris
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      <Card className="w-full max-w-md mx-auto bg-gradient-to-br from-white to-slate-50 border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
         <div className="flex items-center justify-center mb-4">
           <div className="bg-white/20 p-3 rounded-full">
-            <Key className="w-8 h-8" />
+            <User className="w-8 h-8" />
           </div>
         </div>
         <CardTitle className="text-center text-2xl font-bold">
-          Code de vérification
+          Connexion Étudiant
         </CardTitle>
         <CardDescription className="text-center text-blue-100 mt-2">
-          Entrez le code de 6 chiffres envoyé à votre email
+          Connectez-vous avec votre email et mot de passe OFPPT
         </CardDescription>
       </div>
       <CardContent className="p-6">
-        <div className="mb-6 p-4 bg-slate-100 rounded-xl">
-          <div className="flex items-center">
-            <User className="w-5 h-5 text-slate-600 mr-2" />
-            <div>
-              <p className="font-bold text-slate-800">
-                {studentInfo?.first_name} {studentInfo?.last_name}
-              </p>
-              <p className="text-sm text-slate-600">
-                Groupe: {studentInfo?.student_group}
-              </p>
-            </div>
-          </div>
-        </div>
-        <form onSubmit={handleCodeSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="code" className="text-slate-700 font-medium">
-              Code de vérification
+            <Label htmlFor="email" className="text-slate-700 font-medium">
+              Email OFPPT
             </Label>
             <div className="relative">
-              <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
               <Input
-                id="code"
-                type="text"
-                placeholder="123456"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                maxLength={6}
+                id="email"
+                type="email"
+                placeholder="votre-matricule@ofppt-edu.ma"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
-                className="pl-10 py-6 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl text-center text-lg tracking-widest font-mono text-slate-800"
+                className="pl-10 py-6 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl text-slate-800"
               />
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button
+          
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-slate-700 font-medium">
+              Mot de passe
+            </Label>
+            <div className="relative">
+              <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <Input
+                id="password"
+                type="password"
+                placeholder="Votre mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+                className="pl-10 py-6 bg-slate-50 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl text-slate-800"
+              />
+            </div>
+          </div>
+          
+          <Button
+            type="submit"
+            className="w-full py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Connexion en cours...
+              </div>
+            ) : (
+              <div className="flex items-center">
+                Se connecter
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </div>
+            )}
+          </Button>
+          
+          <div className="text-center mt-4">
+            <button
               type="button"
-              variant="outline"
-              className="flex-1 py-6 border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl"
-              onClick={() => setStep("email")}
-              disabled={isLoading}
+              onClick={() => setShowForgotPassword(true)}
+              className="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
             >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Retour
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Vérification...
-                </div>
-              ) : (
-                "Vérifier"
-              )}
-            </Button>
+              Mot de passe oublié ?
+            </button>
           </div>
         </form>
       </CardContent>
     </Card>
+    </>
   );
 };
