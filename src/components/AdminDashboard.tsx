@@ -830,14 +830,45 @@ ${emailModal.message}`;
                 </p>
               </div>
             </div>
-            <Button
-              onClick={onLogout}
-              variant="outline"
-              className="flex items-center gap-2 bg-white/80 hover:bg-red-50 border-red-200 text-red-700 hover:text-red-800 transition-all duration-200"
-            >
-              <LogOut className="h-4 w-4" />
-              Déconnexion
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={async () => {
+                  setImportLoading(true);
+                  try {
+                    await importStudents();
+                    toast({
+                      title: "Importation réussie",
+                      description: "Les étudiants ont été importés avec succès.",
+                    });
+                    window.location.reload();
+                  } catch (error) {
+                    toast({
+                      title: "Erreur d'importation",
+                      description: "Une erreur est survenue lors de l'importation.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setImportLoading(false);
+                  }
+                }}
+                disabled={importLoading}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-white/80 hover:bg-blue-50 border-blue-200 text-blue-700 hover:text-blue-800 transition-all duration-200"
+              >
+                <Users className="h-4 w-4" />
+                {importLoading ? "Importation..." : "Importer les étudiants"}
+              </Button>
+              <Button
+                onClick={onLogout}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-white/80 hover:bg-red-50 border-red-200 text-red-700 hover:text-red-800 transition-all duration-200"
+              >
+                <LogOut className="h-4 w-4" />
+                Déconnexion
+              </Button>
+            </div>
           </div>
         </div>
       </div>
