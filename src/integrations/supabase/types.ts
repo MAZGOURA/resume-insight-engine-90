@@ -64,6 +64,7 @@ export type Database = {
       }
       attestation_requests: {
         Row: {
+          attestation_number: number | null
           cin: string
           created_at: string
           first_name: string
@@ -78,6 +79,7 @@ export type Database = {
           year_requested: number
         }
         Insert: {
+          attestation_number?: number | null
           cin: string
           created_at?: string
           first_name: string
@@ -92,6 +94,7 @@ export type Database = {
           year_requested?: number
         }
         Update: {
+          attestation_number?: number | null
           cin?: string
           created_at?: string
           first_name?: string
@@ -137,6 +140,8 @@ export type Database = {
           inscription_number: string
           last_name: string
           password_changed: boolean | null
+          password_changes_count: number | null
+          password_changes_year: number | null
           password_hash: string | null
           speciality: string
           student_group: string
@@ -156,6 +161,8 @@ export type Database = {
           inscription_number: string
           last_name: string
           password_changed?: boolean | null
+          password_changes_count?: number | null
+          password_changes_year?: number | null
           password_hash?: string | null
           speciality: string
           student_group: string
@@ -175,6 +182,8 @@ export type Database = {
           inscription_number?: string
           last_name?: string
           password_changed?: boolean | null
+          password_changes_count?: number | null
+          password_changes_year?: number | null
           password_hash?: string | null
           speciality?: string
           student_group?: string
@@ -187,13 +196,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_update_attestation_counter: {
+        Args: { new_counter_value: number }
+        Returns: boolean
+      }
+      admin_update_password_changes_counter: {
+        Args: { new_count: number; new_year?: number; student_email: string }
+        Returns: boolean
+      }
       change_student_password: {
         Args: {
           new_password: string
           old_password: string
           student_email: string
         }
-        Returns: boolean
+        Returns: Json
       }
       get_student_request_count: {
         Args: { student_email: string }
@@ -210,6 +227,10 @@ export type Database = {
       reset_attestation_counter: {
         Args: { reset_by_admin?: string }
         Returns: number
+      }
+      reset_password_changes_counter: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {

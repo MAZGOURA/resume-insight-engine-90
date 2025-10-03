@@ -151,8 +151,10 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
     student: Student;
     request: AttestationRequest;
   } | null>(null);
-  const [counterValue, setCounterValue] = useState<number>(0); // Add this state for counter value
+  const [counterValue, setCounterValue] = useState<number>(0);
   const [importLoading, setImportLoading] = useState(false);
+  const [showCounterDialog, setShowCounterDialog] = useState(false);
+  const [newCounterValue, setNewCounterValue] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -715,8 +717,6 @@ ${emailModal.message}`;
   // Add function to reset the attestation counter
   const resetAttestationCounter = async () => {
     try {
-      // Since we're not using Supabase Auth, we need to bypass the is_admin check
-      // by directly updating the counter table instead of using the RPC function
       const { data, error } = await supabase
         .from("attestation_counter")
         .update({
@@ -727,7 +727,6 @@ ${emailModal.message}`;
         })
         .eq("id", 1);
 
-      // If update failed because no row exists, insert a new row
       if (error && error.message.includes("no rows")) {
         const { data: insertData, error: insertError } = await supabase
           .from("attestation_counter")
@@ -750,16 +749,51 @@ ${emailModal.message}`;
         description: "Le compteur d'attestations a été réinitialisé à 0.",
       });
 
-      // Update the counter value state
       setCounterValue(0);
-
-      // Refresh the requests to update any related data
       fetchRequests();
     } catch (error) {
       console.error("Reset counter error:", error);
       toast({
         title: "Erreur",
         description: "Impossible de réinitialiser le compteur d'attestations.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Function to update attestation counter to a specific value
+  const updateAttestationCounter = async () => {
+    const value = parseInt(newCounterValue);
+    if (isNaN(value) || value < 0) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez entrer une valeur valide (nombre positif).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.rpc("admin_update_attestation_counter", {
+        new_counter_value: value,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Succès",
+        description: `Le compteur a été modifié à ${value}.`,
+      });
+
+      setCounterValue(value);
+      setShowCounterDialog(false);
+      setNewCounterValue("");
+      fetchRequests();
+    } catch (error) {
+      console.error("Update counter error:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le compteur d'attestations.",
         variant: "destructive",
       });
     }
@@ -1007,23 +1041,35 @@ ${emailModal.message}`;
           <Card className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-purple-100">
-                Réinitialiser Compteur
+                Compteur Attestations
               </CardTitle>
-              <RotateCcw className="h-5 w-5 text-purple-200" />
+              <Settings className="h-5 w-5 text-purple-200" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold mb-2 text-center">
+              <div className="text-2xl font-bold mb-3 text-center">
                 {counterValue}
               </div>
-              <Button
-                onClick={resetAttestationCounter}
-                className="w-full bg-white text-purple-600 hover:bg-purple-50 font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-200"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Réinitialiser
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  onClick={resetAttestationCounter}
+                  className="w-full bg-white text-purple-600 hover:bg-purple-50 font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-200"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Réinitialiser à 0
+                </Button>
+                <Button
+                  onClick={() => {
+                    setNewCounterValue(counterValue.toString());
+                    setShowCounterDialog(true);
+                  }}
+                  className="w-full bg-white/90 text-purple-600 hover:bg-purple-50 font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-200"
+                >
+                  <Settings className="h-4 w-4" />
+                  Modifier
+                </Button>
+              </div>
               <p className="text-xs text-purple-100 mt-2 text-center">
-                Remettre le compteur à zéro
+                Gérer le compteur d'attestations
               </p>
             </CardContent>
           </Card>
@@ -1465,40 +1511,73 @@ ${emailModal.message}`;
             
             <div>
               <Label htmlFor="email-subject">Objet :</Label>
-              <Input 
-                id="email-subject" 
-                value={emailModal.subject} 
-                onChange={(e) => setEmailModal(prev => ({ ...prev, subject: e.target.value }))}
-              />
+              <Input id="email-subject" value={emailModal.subject} disabled />
             </div>
             
             <div>
               <Label htmlFor="email-message">Message :</Label>
               <Textarea 
                 id="email-message" 
-                rows={12}
-                value={emailModal.message}
-                onChange={(e) => setEmailModal(prev => ({ ...prev, message: e.target.value }))}
-                className="resize-none"
+                value={emailModal.message} 
+                disabled
+                className="min-h-[250px] font-mono text-sm"
               />
             </div>
           </div>
           
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
-              onClick={copyEmailToClipboard}
-              className="flex items-center gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              Copier le contenu
+            <Button variant="outline" onClick={copyEmailToClipboard}>
+              Copier
             </Button>
-            <Button 
-              onClick={openEmailClient}
-              className="flex items-center gap-2"
+            <Button onClick={openEmailClient}>
+              Ouvrir dans mon client email
+            </Button>
+            <Button variant="secondary" onClick={() => setEmailModal(prev => ({ ...prev, isOpen: false }))}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog pour modifier le compteur */}
+      <Dialog open={showCounterDialog} onOpenChange={setShowCounterDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" />
+              Modifier le Compteur d'Attestations
+            </DialogTitle>
+            <DialogDescription>
+              Entrez la nouvelle valeur pour le compteur d'attestations.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="counter-value">Nouvelle valeur</Label>
+              <Input
+                id="counter-value"
+                type="number"
+                min="0"
+                placeholder="Entrez un nombre"
+                value={newCounterValue}
+                onChange={(e) => setNewCounterValue(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCounterDialog(false);
+                setNewCounterValue("");
+              }}
             >
-              <Mail className="h-4 w-4" />
-              Ouvrir le client email
+              Annuler
+            </Button>
+            <Button onClick={updateAttestationCounter}>
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>

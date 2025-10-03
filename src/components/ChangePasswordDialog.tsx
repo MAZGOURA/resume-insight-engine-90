@@ -73,10 +73,22 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
         new_password: newPassword,
       });
 
-      if (error || !data) {
+      if (error) {
         toast({
           title: "Erreur",
-          description: "Impossible de changer le mot de passe",
+          description: error.message || "Impossible de changer le mot de passe",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // La fonction retourne maintenant un objet JSON
+      const result = data as { success: boolean; error?: string; remaining?: number };
+      
+      if (!result.success) {
+        toast({
+          title: "Erreur",
+          description: result.error || "Impossible de changer le mot de passe",
           variant: "destructive",
         });
         return;
@@ -84,10 +96,14 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
 
       toast({
         title: "Succès",
-        description: "Votre mot de passe a été changé avec succès",
+        description: `Votre mot de passe a été changé avec succès. ${
+          result.remaining !== undefined ? `Il vous reste ${result.remaining} changement(s) cette année.` : ''
+        }`,
       });
 
       onClose();
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (error) {
       toast({
         title: "Erreur",
