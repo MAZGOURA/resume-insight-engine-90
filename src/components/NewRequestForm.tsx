@@ -252,7 +252,6 @@ export const NewRequestForm: React.FC = () => {
         isOpen={showChangePassword}
         onClose={() => setShowChangePassword(false)}
         studentEmail={authenticatedStudent.email}
-        currentPassword=""
       />
       
       <div className="w-full max-w-4xl mx-auto">

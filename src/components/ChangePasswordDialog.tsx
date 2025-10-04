@@ -18,14 +18,12 @@ interface ChangePasswordDialogProps {
   isOpen: boolean;
   onClose: () => void;
   studentEmail: string;
-  currentPassword: string;
 }
 
 export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
   isOpen,
   onClose,
   studentEmail,
-  currentPassword,
 }) => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -55,23 +53,18 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
       return;
     }
 
-    if (newPassword === currentPassword) {
-      toast({
-        title: "Erreur",
-        description: "Le nouveau mot de passe doit être différent de l'ancien",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.rpc("change_student_password", {
-        student_email: studentEmail,
-        old_password: currentPassword,
-        new_password: newPassword,
-      });
+      // Update password directly without requiring old password
+      const { error } = await supabase
+        .from("students")
+        .update({
+          password_hash: newPassword,
+          password_changed: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("email", studentEmail);
 
       if (error) {
         toast({
@@ -82,23 +75,12 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
         return;
       }
 
-      // La fonction retourne maintenant un objet JSON
-      const result = data as { success: boolean; error?: string; remaining?: number };
-      
-      if (!result.success) {
-        toast({
-          title: "Erreur",
-          description: result.error || "Impossible de changer le mot de passe",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Update localStorage with new password
+      localStorage.setItem("student_password", newPassword);
 
       toast({
         title: "Succès",
-        description: `Votre mot de passe a été changé avec succès. ${
-          result.remaining !== undefined ? `Il vous reste ${result.remaining} changement(s) cette année.` : ''
-        }`,
+        description: "Votre mot de passe a été changé avec succès.",
       });
 
       onClose();
@@ -124,7 +106,7 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
             Changer votre mot de passe
           </DialogTitle>
           <DialogDescription>
-            Pour votre sécurité, veuillez changer votre mot de passe initial (numéro d'inscription).
+            Pour votre sécurité, veuillez changer votre mot de passe initial.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

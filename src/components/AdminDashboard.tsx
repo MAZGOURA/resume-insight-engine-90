@@ -68,6 +68,7 @@ import {
 } from "lucide-react";
 import { AttestationGenerator } from "./AttestationGenerator";
 import { StudentManagement } from "./StudentManagement";
+import { AttestationCounterDialog } from "./AttestationCounterDialog";
 import { importStudents } from "@/utils/studentImport";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
@@ -154,7 +155,8 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
   const [counterValue, setCounterValue] = useState<number>(0);
   const [importLoading, setImportLoading] = useState(false);
   const [showCounterDialog, setShowCounterDialog] = useState(false);
-  const [newCounterValue, setNewCounterValue] = useState<string>("");
+  const [showAttestationCounterInput, setShowAttestationCounterInput] = useState(false);
+  const [manualAttestationNumber, setManualAttestationNumber] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -481,6 +483,8 @@ ${emailModal.message}`;
 
         if (error) throw error;
 
+        // Show dialog to enter attestation number manually
+        setShowAttestationCounterInput(true);
         setShowAttestation({
           student: studentData,
           request: request,
@@ -495,6 +499,8 @@ ${emailModal.message}`;
 
         if (error) throw error;
 
+        // Show dialog to enter attestation number manually
+        setShowAttestationCounterInput(true);
         setShowAttestation({
           student: studentData,
           request: request,
@@ -505,6 +511,42 @@ ${emailModal.message}`;
       toast({
         title: "Erreur",
         description: "Impossible de charger les données de l'étudiant.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAttestationNumberSubmit = async () => {
+    const numValue = parseInt(manualAttestationNumber);
+    if (isNaN(numValue) || numValue < 0) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez entrer un numéro valide",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update the global counter with the manual value
+      const { error } = await supabase.rpc("admin_update_attestation_counter", {
+        new_counter_value: numValue,
+      });
+
+      if (error) throw error;
+
+      setCounterValue(numValue);
+      setShowAttestationCounterInput(false);
+      setManualAttestationNumber("");
+
+      toast({
+        title: "Succès",
+        description: `Numéro d'attestation défini: ${numValue}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: (error as Error).message || "Erreur lors de la mise à jour du compteur",
         variant: "destructive",
       });
     }
@@ -761,42 +803,9 @@ ${emailModal.message}`;
     }
   };
 
-  // Function to update attestation counter to a specific value
+  // Function to update attestation counter (removed - using dialog now)
   const updateAttestationCounter = async () => {
-    const value = parseInt(newCounterValue);
-    if (isNaN(value) || value < 0) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez entrer une valeur valide (nombre positif).",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { error } = await supabase.rpc("admin_update_attestation_counter", {
-        new_counter_value: value,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Succès",
-        description: `Le compteur a été modifié à ${value}.`,
-      });
-
-      setCounterValue(value);
-      setShowCounterDialog(false);
-      setNewCounterValue("");
-      fetchRequests();
-    } catch (error) {
-      console.error("Update counter error:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de modifier le compteur d'attestations.",
-        variant: "destructive",
-      });
-    }
+    // This function is no longer used - replaced by AttestationCounterDialog
   };
 
   if (showStudentManagement) {
@@ -1059,7 +1068,6 @@ ${emailModal.message}`;
                 </Button>
                 <Button
                   onClick={() => {
-                    setNewCounterValue(counterValue.toString());
                     setShowCounterDialog(true);
                   }}
                   className="w-full bg-white/90 text-purple-600 hover:bg-purple-50 font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-200"
@@ -1401,8 +1409,7 @@ ${emailModal.message}`;
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1 sm:gap-2">
-                                    {/* Always show approve and reject buttons for flexibility */}
-                                    <Button
+                                     <Button
                                       onClick={() =>
                                         updateStatus(request.id, "approved")
                                       }
@@ -1415,27 +1422,6 @@ ${emailModal.message}`;
                                         Approuver
                                       </span>
                                     </Button>
-                                    <Button
-                                      onClick={() => {
-                                        const reason = prompt(
-                                          "Raison du rejet (optionnel):"
-                                        );
-                                        updateStatus(
-                                          request.id,
-                                          "rejected",
-                                          reason || undefined
-                                        );
-                                      }}
-                                      size="sm"
-                                      variant="destructive"
-                                      className="shadow-sm hover:shadow-md transition-all duration-200 h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
-                                      disabled={request.status === "rejected"}
-                                    >
-                                      <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                                      <span className="hidden sm:ml-2 sm:inline">
-                                        Rejeter
-                                      </span>
-                                    </Button>
                                     {request.status === "approved" && (
                                       <Button
                                         onClick={() =>
@@ -1445,7 +1431,7 @@ ${emailModal.message}`;
                                         variant="outline"
                                         className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 shadow-sm hover:shadow-md transition-all duration-200 h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
                                       >
-                                        <Eye className="h-33 w-3 sm:h-4 sm:w-4" />
+                                        <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                                         <span className="hidden sm:ml-2 sm:inline">
                                           Voir
                                         </span>
@@ -1539,30 +1525,34 @@ ${emailModal.message}`;
         </DialogContent>
       </Dialog>
 
-      {/* Dialog pour modifier le compteur */}
-      <Dialog open={showCounterDialog} onOpenChange={setShowCounterDialog}>
+      {/* Dialog pour saisir manuellement le numéro d'attestation */}
+      <Dialog open={showAttestationCounterInput} onOpenChange={setShowAttestationCounterInput}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5 text-primary" />
-              Modifier le Compteur d'Attestations
+              Définir le Numéro d'Attestation
             </DialogTitle>
             <DialogDescription>
-              Entrez la nouvelle valeur pour le compteur d'attestations.
+              Entrez le numéro d'attestation à utiliser pour ce document. Le compteur global sera mis à jour avec cette valeur.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="counter-value">Nouvelle valeur</Label>
+              <Label htmlFor="attestation-number">Numéro d'attestation</Label>
               <Input
-                id="counter-value"
+                id="attestation-number"
                 type="number"
-                min="0"
-                placeholder="Entrez un nombre"
-                value={newCounterValue}
-                onChange={(e) => setNewCounterValue(e.target.value)}
+                min="1"
+                placeholder="Entrez le numéro (ex: 1, 2, 3...)"
+                value={manualAttestationNumber}
+                onChange={(e) => setManualAttestationNumber(e.target.value)}
+                className="text-lg font-bold"
               />
+              <p className="text-sm text-muted-foreground mt-2">
+                Valeur actuelle du compteur: {counterValue}
+              </p>
             </div>
           </div>
           
@@ -1570,18 +1560,29 @@ ${emailModal.message}`;
             <Button
               variant="outline"
               onClick={() => {
-                setShowCounterDialog(false);
-                setNewCounterValue("");
+                setShowAttestationCounterInput(false);
+                setManualAttestationNumber("");
               }}
             >
               Annuler
             </Button>
-            <Button onClick={updateAttestationCounter}>
-              Enregistrer
+            <Button onClick={handleAttestationNumberSubmit}>
+              Enregistrer et continuer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog pour modifier le compteur global */}
+      <AttestationCounterDialog
+        isOpen={showCounterDialog}
+        onClose={() => setShowCounterDialog(false)}
+        attestationNumber={counterValue}
+        onSave={(newValue) => {
+          setCounterValue(newValue);
+          fetchRequests();
+        }}
+      />
     </div>
   );
 };

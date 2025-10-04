@@ -58,11 +58,56 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({
 }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [authenticatedStudent, setAuthenticatedStudent] = useState<any>(null);
   const { toast } = useToast();
+
+  // Check for persisted session on mount
+  React.useEffect(() => {
+    const checkPersistedSession = async () => {
+      const storedEmail = localStorage.getItem("student_email");
+      const storedPassword = localStorage.getItem("student_password");
+
+      if (storedEmail && storedPassword) {
+        try {
+          const { data: studentData, error } = await supabase
+            .from("students")
+            .select("*")
+            .eq("email", storedEmail)
+            .eq("password_hash", storedPassword)
+            .single();
+
+          if (!error && studentData) {
+            const { data: requestCount } = await supabase.rpc(
+              "get_student_request_count",
+              { student_email: storedEmail }
+            );
+
+            const studentWithRequestCount = {
+              ...studentData,
+              student_group: studentData.student_group as any,
+              requestCount: requestCount || 0,
+            };
+
+            onAuthenticated(studentWithRequestCount);
+          } else {
+            // Clear invalid session
+            localStorage.removeItem("student_email");
+            localStorage.removeItem("student_password");
+          }
+        } catch (error) {
+          console.error("Error checking persisted session:", error);
+          localStorage.removeItem("student_email");
+          localStorage.removeItem("student_password");
+        }
+      }
+      setIsLoading(false);
+    };
+
+    checkPersistedSession();
+  }, [onAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +154,10 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({
         requestCount: requestCount || 0,
       };
 
+      // Store credentials in localStorage for session persistence
+      localStorage.setItem("student_email", email);
+      localStorage.setItem("student_password", password);
+
       toast({
         title: "Connexion réussie",
         description: `Bienvenue ${studentData.first_name} ${studentData.last_name}`,
@@ -139,13 +188,25 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-6"></div>
+          <p className="text-lg text-slate-600 font-medium">
+            Chargement...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <ChangePasswordDialog
         isOpen={showChangePassword}
         onClose={handleCloseChangePassword}
         studentEmail={email}
-        currentPassword={password}
       />
       
       {/* Forgot Password Dialog */}
@@ -177,8 +238,8 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({
         </div>
       )}
       
-      <Card className="w-full max-w-md mx-auto bg-gradient-to-br from-white to-slate-50 border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
+      <Card className="w-full max-w-md mx-auto bg-white border-green-200 shadow-2xl rounded-2xl overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-green-600 p-6 text-white">
         <div className="flex items-center justify-center mb-4">
           <div className="bg-white/20 p-3 rounded-full">
             <User className="w-8 h-8" />
@@ -233,7 +294,7 @@ export const StudentAuth: React.FC<StudentAuthProps> = ({
           
           <Button
             type="submit"
-            className="w-full py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
+            className="w-full py-6 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
             disabled={isLoading}
           >
             {isLoading ? (
