@@ -73,6 +73,7 @@ import { importStudents } from "@/utils/studentImport";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import ofpptLogo from "@/assets/ofppt-logo.png";
+import * as XLSX from "xlsx";
 
 interface AttestationRequest {
   id: string;
@@ -156,6 +157,10 @@ const AdminDashboard = ({ adminProfile, onLogout }: AdminDashboardProps) => {
   const [importLoading, setImportLoading] = useState(false);
   const [showCounterDialog, setShowCounterDialog] = useState(false);
   const [showAttestationCounterInput, setShowAttestationCounterInput] = useState(false);
+  const [pendingAttestationData, setPendingAttestationData] = useState<{
+    student: Student;
+    request: AttestationRequest;
+  } | null>(null);
   const [manualAttestationNumber, setManualAttestationNumber] = useState<string>("");
   const { toast } = useToast();
 
@@ -483,12 +488,12 @@ ${emailModal.message}`;
 
         if (error) throw error;
 
-        // Show dialog to enter attestation number manually
-        setShowAttestationCounterInput(true);
-        setShowAttestation({
+        // Store the data and show input dialog FIRST
+        setPendingAttestationData({
           student: studentData,
           request: request,
         });
+        setShowAttestationCounterInput(true);
       } else {
         // Récupérer les données complètes de l'étudiant par ID
         const { data: studentData, error } = await supabase
@@ -499,12 +504,12 @@ ${emailModal.message}`;
 
         if (error) throw error;
 
-        // Show dialog to enter attestation number manually
-        setShowAttestationCounterInput(true);
-        setShowAttestation({
+        // Store the data and show input dialog FIRST
+        setPendingAttestationData({
           student: studentData,
           request: request,
         });
+        setShowAttestationCounterInput(true);
       }
     } catch (error) {
       console.error("Error loading student data:", error);
@@ -539,6 +544,12 @@ ${emailModal.message}`;
       setShowAttestationCounterInput(false);
       setManualAttestationNumber("");
 
+      // NOW show the attestation with the pending data
+      if (pendingAttestationData) {
+        setShowAttestation(pendingAttestationData);
+        setPendingAttestationData(null);
+      }
+
       toast({
         title: "Succès",
         description: `Numéro d'attestation défini: ${numValue}`,
@@ -562,6 +573,58 @@ ${emailModal.message}`;
     if (group.startsWith("DEV")) return "DEV";
     if (group.startsWith("ID")) return "ID";
     return "Autre";
+  };
+
+  // Function to export attestation requests to Excel
+  const exportRequestsToExcel = () => {
+    try {
+      // Prepare data for Excel
+      const excelData = filteredRequests.map((request) => ({
+        "Nom": request.last_name,
+        "Prénom": request.first_name,
+        "CIN": request.cin,
+        "Téléphone": request.phone,
+        "Groupe": request.student_group,
+        "Email": request.students?.email || "N/A",
+        "Statut": getStatusLabel(request.status),
+        "Date de demande": new Date(request.created_at).toLocaleDateString("fr-FR"),
+        "Année": new Date(request.created_at).getFullYear(),
+      }));
+
+      // Create worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 15 }, // Nom
+        { wch: 15 }, // Prénom
+        { wch: 12 }, // CIN
+        { wch: 15 }, // Téléphone
+        { wch: 12 }, // Groupe
+        { wch: 25 }, // Email
+        { wch: 12 }, // Statut
+        { wch: 15 }, // Date
+        { wch: 8 },  // Année
+      ];
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Demandes");
+
+      // Generate Excel file
+      XLSX.writeFile(wb, `demandes_attestation_${new Date().toISOString().split("T")[0]}.xlsx`);
+
+      toast({
+        title: "Export réussi",
+        description: `${filteredRequests.length} demandes exportées en Excel.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur d'export",
+        description: "Impossible de générer le fichier Excel. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Function to export student list to PDF organized by group
@@ -1271,7 +1334,17 @@ ${emailModal.message}`;
                   >
                     <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span className="hidden sm:ml-2 sm:inline">
-                      Télécharger Liste
+                      PDF
+                    </span>
+                  </Button>
+                  <Button
+                    onClick={exportRequestsToExcel}
+                    variant="outline"
+                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 shadow-sm hover:shadow-md transition-all duration-200 h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
+                  >
+                    <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:ml-2 sm:inline">
+                      Excel
                     </span>
                   </Button>
                 </div>

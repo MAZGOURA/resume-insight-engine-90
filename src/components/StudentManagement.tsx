@@ -53,6 +53,7 @@ import {
 import ofpptLogo from "@/assets/ofppt-logo.png";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 interface Student {
   id: string;
@@ -321,6 +322,63 @@ export const StudentManagement = ({
       toast({
         title: "Erreur",
         description: "Impossible de supprimer l'étudiant.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportToExcel = () => {
+    try {
+      // Prepare data for Excel
+      const excelData = filteredStudents.map((student) => ({
+        "Prénom": student.first_name,
+        "Nom": student.last_name,
+        "CIN": student.cin,
+        "Email": student.email,
+        "Date de naissance": new Date(student.birth_date).toLocaleDateString("fr-FR"),
+        "Niveau de formation": student.formation_level,
+        "Spécialité": student.speciality,
+        "Groupe": student.student_group,
+        "N° d'inscription": student.inscription_number,
+        "Type de formation": student.formation_type,
+        "Mode de formation": student.formation_mode,
+        "Année de formation": student.formation_year,
+      }));
+
+      // Create worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 15 }, // Prénom
+        { wch: 15 }, // Nom
+        { wch: 12 }, // CIN
+        { wch: 25 }, // Email
+        { wch: 15 }, // Date de naissance
+        { wch: 20 }, // Niveau de formation
+        { wch: 25 }, // Spécialité
+        { wch: 12 }, // Groupe
+        { wch: 15 }, // N° inscription
+        { wch: 18 }, // Type de formation
+        { wch: 18 }, // Mode de formation
+        { wch: 18 }, // Année de formation
+      ];
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Étudiants");
+
+      // Generate Excel file
+      XLSX.writeFile(wb, `etudiants_${new Date().toISOString().split("T")[0]}.xlsx`);
+
+      toast({
+        title: "Export réussi",
+        description: `${filteredStudents.length} étudiants exportés en Excel.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur d'export",
+        description: "Impossible de générer le fichier Excel. Veuillez réessayer.",
         variant: "destructive",
       });
     }
@@ -1048,6 +1106,15 @@ export const StudentManagement = ({
                   >
                     <Download className="h-4 w-4" />
                     <span className="hidden sm:inline">PDF</span>
+                  </Button>
+                  <Button
+                    onClick={exportToExcel}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-colors w-full sm:w-auto"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Excel</span>
                   </Button>
                 </div>
               </div>
