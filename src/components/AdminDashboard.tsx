@@ -69,7 +69,7 @@ import {
 import { AttestationGenerator } from "./AttestationGenerator";
 import { StudentManagement } from "./StudentManagement";
 import { AttestationCounterDialog } from "./AttestationCounterDialog";
-import { importStudents } from "@/utils/studentImport";
+import { importExcelStudents } from "@/utils/importFromExcel";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import ofpptLogo from "@/assets/ofppt-logo.png";
@@ -85,6 +85,7 @@ interface AttestationRequest {
   status: string;
   created_at: string;
   student_id?: string;
+  attestation_number?: number;
   students?: {
     email: string;
   };
@@ -533,27 +534,41 @@ ${emailModal.message}`;
     }
 
     try {
-      // Update the global counter with the manual value
-      const { error } = await supabase.rpc("admin_update_attestation_counter", {
-        new_counter_value: numValue,
-      });
-
-      if (error) throw error;
-
-      setCounterValue(numValue);
-      setShowAttestationCounterInput(false);
-      setManualAttestationNumber("");
-
-      // NOW show the attestation with the pending data
+      // Update the attestation request with the manual number
       if (pendingAttestationData) {
-        setShowAttestation(pendingAttestationData);
-        setPendingAttestationData(null);
-      }
+        const { error: updateError } = await supabase
+          .from("attestation_requests")
+          .update({ attestation_number: numValue })
+          .eq("id", pendingAttestationData.request.id);
 
-      toast({
-        title: "Succès",
-        description: `Numéro d'attestation défini: ${numValue}`,
-      });
+        if (updateError) throw updateError;
+
+        // Update the global counter with the manual value
+        const { error: counterError } = await supabase.rpc("admin_update_attestation_counter", {
+          new_counter_value: numValue,
+        });
+
+        if (counterError) throw counterError;
+
+        setCounterValue(numValue);
+        setShowAttestationCounterInput(false);
+        setManualAttestationNumber("");
+
+        // NOW show the attestation with the pending data and updated number
+        setShowAttestation({
+          ...pendingAttestationData,
+          request: {
+            ...pendingAttestationData.request,
+            attestation_number: numValue,
+          },
+        });
+        setPendingAttestationData(null);
+
+        toast({
+          title: "Succès",
+          description: `Numéro d'attestation défini: ${numValue}`,
+        });
+      }
     } catch (error) {
       toast({
         title: "Erreur",
@@ -941,12 +956,15 @@ ${emailModal.message}`;
                 onClick={async () => {
                   setImportLoading(true);
                   try {
-                    await importStudents();
+                    const result = await importExcelStudents();
                     toast({
-                      title: "Importation réussie",
-                      description: "Les étudiants ont été importés avec succès.",
+                      title: result.success ? "Importation réussie" : "Erreur d'importation",
+                      description: result.message,
+                      variant: result.success ? "default" : "destructive",
                     });
-                    window.location.reload();
+                    if (result.success) {
+                      window.location.reload();
+                    }
                   } catch (error) {
                     toast({
                       title: "Erreur d'importation",
