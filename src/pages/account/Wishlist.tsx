@@ -54,12 +54,14 @@ const AccountWishlist = () => {
               id,
               name,
               price,
-              category,
               description,
               image_url,
               notes,
               size,
-              rating
+              category_id,
+              categories (
+                name
+              )
             )
           `
           )
@@ -68,7 +70,17 @@ const AccountWishlist = () => {
 
         if (error) throw error;
 
-        setWishlistItems(data || []);
+        // Transform the data to match the expected interface
+        const transformedData = data?.map(item => ({
+          ...item,
+          products: {
+            ...item.products,
+            category: item.products.categories?.name || "",
+            rating: 4 // Default rating since products table doesn't have rating
+          }
+        })) || [];
+
+        setWishlistItems(transformedData as any);
       } catch (err) {
         console.error("Error fetching wishlist:", err);
         setError("Failed to load wishlist");

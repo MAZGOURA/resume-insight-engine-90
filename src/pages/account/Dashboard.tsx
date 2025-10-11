@@ -55,7 +55,7 @@ const AccountDashboard = () => {
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("full_name, email, created_at")
+          .select("full_name, created_at")
           .eq("id", user.id)
           .single();
 
@@ -63,7 +63,7 @@ const AccountDashboard = () => {
 
         setProfile({
           full_name: profileData.full_name || "User",
-          email: profileData.email,
+          email: user.email || "",
           created_at: new Date(profileData.created_at).toLocaleDateString(),
         });
 

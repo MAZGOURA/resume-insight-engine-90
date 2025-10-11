@@ -1745,8 +1745,8 @@ const AdminManagement = () => {
                                     code: coupon.code,
                                     discount_type: coupon.discount_type,
                                     discount_value: coupon.discount_value,
-                                    minimum_purchase_amount:
-                                      coupon.minimum_purchase_amount,
+                                    minimum_order_amount:
+                                      coupon.minimum_order_amount,
                                     valid_from: coupon.valid_from,
                                     valid_until: coupon.valid_until,
                                     usage_limit: coupon.usage_limit,
@@ -1850,8 +1850,8 @@ const AdminManagement = () => {
                           <TableCell>{config.name}</TableCell>
                           <TableCell>
                             {config.type === "tax"
-                              ? `${config.rate}%`
-                              : `$${config.amount}`}
+                              ? `${config.rate_value}%`
+                              : `${config.rate_value}`}
                           </TableCell>
                           <TableCell>
                             <span
@@ -1874,10 +1874,10 @@ const AdminManagement = () => {
                                   setFormData({
                                     type: config.type,
                                     name: config.name,
-                                    rate: config.rate,
-                                    amount: config.amount,
-                                    min_order_value: config.min_order_value,
-                                    max_order_value: config.max_order_value,
+                                    rate_value: config.rate_value,
+                                    rate_type: config.rate_type,
+                                    min_order_amount: config.min_order_amount,
+                                    max_order_amount: config.max_order_amount,
                                     is_active: config.is_active,
                                   });
                                   setCurrentSection("shipping-tax");
@@ -1948,11 +1948,13 @@ const AdminManagement = () => {
                           <TableCell>
                             <span
                               className={`px-2 py-1 rounded-full text-xs ${
-                                order.status === "completed"
+                                order.status === "delivered"
                                   ? "bg-green-100 text-green-800"
-                                  : order.status === "pending"
+                                  : order.status === "shipped"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : order.status === "processing"
                                   ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
                               }`}
                             >
                               {order.status}

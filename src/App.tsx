@@ -13,25 +13,17 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
-import OrderConfirmation from "./pages/OrderConfirmation";
 import About from "./pages/About";
-import Contact from "./pages/Contact";
 import FAQ from "./pages/FAQ";
 import Mall from "./pages/Mall";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
-import AdminOrders from "./pages/admin/AdminOrders";
 import AdminCustomers from "./pages/admin/AdminCustomers";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
-import AdminSettings from "./pages/admin/AdminSettings";
 import AdminTest from "./pages/admin/AdminTest";
-import AdminDrivers from "./pages/admin/AdminDrivers";
-import AdminDriverAssignments from "./pages/admin/AdminDriverAssignments";
-import AdminDriverPayments from "./pages/admin/AdminDriverPayments";
 import AccountDashboard from "./pages/account/Dashboard";
 import AccountProfile from "./pages/account/Profile";
 import AccountOrders from "./pages/account/Orders";
@@ -43,9 +35,6 @@ import AccountSecurity from "./pages/account/Security";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import TestSupabase from "./pages/TestSupabase";
-import DriverLogin from "./pages/driver/Login";
-import DriverDashboard from "./pages/driver/Dashboard";
-import DriverPayments from "./pages/driver/Payments";
 
 const queryClient = new QueryClient();
 
@@ -75,13 +64,7 @@ const App = () => (
                     <Route path="/mall" element={<Mall />} />
                     <Route path="/product/:id" element={<ProductDetail />} />
                     <Route path="/cart" element={<Cart />} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route
-                      path="/order-confirmation/:orderId"
-                      element={<OrderConfirmation />}
-                    />
                     <Route path="/about" element={<About />} />
-                    <Route path="/contact" element={<Contact />} />
                     <Route path="/faq" element={<FAQ />} />
                   </Route>
 
@@ -157,25 +140,6 @@ const App = () => (
                     }
                   />
 
-                  {/* Driver Routes */}
-                  <Route path="/driver/login" element={<DriverLogin />} />
-                  <Route
-                    path="/driver/dashboard"
-                    element={
-                      <ProtectedRoute requiredRole="driver">
-                        <DriverDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/driver/payments"
-                    element={
-                      <ProtectedRoute requiredRole="driver">
-                        <DriverPayments />
-                      </ProtectedRoute>
-                    }
-                  />
-
                   {/* Admin Routes */}
                   <Route path="/admin/login" element={<AdminLogin />} />
                   <Route
@@ -195,22 +159,6 @@ const App = () => (
                     }
                   />
                   <Route
-                    path="/admin/orders"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/customers"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminCustomers />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
                     path="/admin/categories"
                     element={
                       <ProtectedRoute requiredRole="admin">
@@ -219,42 +167,10 @@ const App = () => (
                     }
                   />
                   <Route
-                    path="/admin/drivers"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminDrivers />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/driver-assignments"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminDriverAssignments />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/driver-payments"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminDriverPayments />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
                     path="/admin/analytics"
                     element={
                       <ProtectedRoute requiredRole="admin">
                         <AdminAnalytics />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/settings"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminSettings />
                       </ProtectedRoute>
                     }
                   />

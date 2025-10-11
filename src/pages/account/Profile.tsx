@@ -38,7 +38,7 @@ const AccountProfile = () => {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("full_name, email, phone, created_at, avatar_url")
+          .select("full_name, phone, created_at, avatar_url")
           .eq("id", user.id)
           .single();
 
@@ -46,7 +46,7 @@ const AccountProfile = () => {
 
         setProfile({
           full_name: data.full_name || "",
-          email: data.email,
+          email: user.email || "",
           phone: data.phone || "",
           avatar_url: data.avatar_url || "",
           created_at: new Date(data.created_at).toLocaleDateString(),
