@@ -190,6 +190,42 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_messages: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_read: boolean | null
+          message: string
+          name: string
+          responded_at: string | null
+          response: string | null
+          subject: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          name: string
+          responded_at?: string | null
+          response?: string | null
+          subject: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          name?: string
+          responded_at?: string | null
+          response?: string | null
+          subject?: string
+        }
+        Relationships: []
+      }
       coupons: {
         Row: {
           code: string
@@ -543,6 +579,30 @@ export type Database = {
           },
         ]
       }
+      newsletter_subscriptions: {
+        Row: {
+          email: string
+          id: string
+          is_active: boolean | null
+          subscribed_at: string | null
+          unsubscribed_at: string | null
+        }
+        Insert: {
+          email: string
+          id?: string
+          is_active?: boolean | null
+          subscribed_at?: string | null
+          unsubscribed_at?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          subscribed_at?: string | null
+          unsubscribed_at?: string | null
+        }
+        Relationships: []
+      }
       order_coupons: {
         Row: {
           coupon_id: string | null
@@ -630,11 +690,47 @@ export type Database = {
           },
         ]
       }
+      order_status_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          status: Database["public"]["Enums"]["order_status"]
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          status: Database["public"]["Enums"]["order_status"]
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          status?: Database["public"]["Enums"]["order_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           billing_address: Json | null
           cancelled_at: string | null
           cancelled_reason: string | null
+          carrier: string | null
           created_at: string | null
           currency: string | null
           delivered_at: string | null
@@ -651,6 +747,7 @@ export type Database = {
           subtotal: number
           tax_amount: number | null
           total_amount: number
+          tracking_number: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -658,6 +755,7 @@ export type Database = {
           billing_address?: Json | null
           cancelled_at?: string | null
           cancelled_reason?: string | null
+          carrier?: string | null
           created_at?: string | null
           currency?: string | null
           delivered_at?: string | null
@@ -674,6 +772,7 @@ export type Database = {
           subtotal: number
           tax_amount?: number | null
           total_amount: number
+          tracking_number?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -681,6 +780,7 @@ export type Database = {
           billing_address?: Json | null
           cancelled_at?: string | null
           cancelled_reason?: string | null
+          carrier?: string | null
           created_at?: string | null
           currency?: string | null
           delivered_at?: string | null
@@ -697,6 +797,7 @@ export type Database = {
           subtotal?: number
           tax_amount?: number | null
           total_amount?: number
+          tracking_number?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -899,6 +1000,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           date_of_birth: string | null
+          email: string | null
           full_name: string | null
           id: string
           phone: string | null
@@ -908,6 +1010,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           date_of_birth?: string | null
+          email?: string | null
           full_name?: string | null
           id: string
           phone?: string | null
@@ -917,6 +1020,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string | null
           date_of_birth?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
           phone?: string | null

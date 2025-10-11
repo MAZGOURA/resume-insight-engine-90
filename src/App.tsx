@@ -15,6 +15,7 @@ import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import About from "./pages/About";
 import FAQ from "./pages/FAQ";
+import Contact from "./pages/Contact";
 import Mall from "./pages/Mall";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -23,6 +24,7 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminCustomers from "./pages/admin/AdminCustomers";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
+import AdminManagement from "./pages/admin/AdminManagement";
 import AdminTest from "./pages/admin/AdminTest";
 import AccountDashboard from "./pages/account/Dashboard";
 import AccountProfile from "./pages/account/Profile";
@@ -66,6 +68,7 @@ const App = () => (
                     <Route path="/cart" element={<Cart />} />
                     <Route path="/about" element={<About />} />
                     <Route path="/faq" element={<FAQ />} />
+                    <Route path="/contact" element={<Contact />} />
                   </Route>
 
                   {/* Authentication Routes */}
@@ -166,14 +169,22 @@ const App = () => (
                       </ProtectedRoute>
                     }
                   />
-                  <Route
-                    path="/admin/analytics"
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminAnalytics />
-                      </ProtectedRoute>
-                    }
-                  />
+            <Route
+              path="/admin/analytics"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminAnalytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/management"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminManagement />
+                </ProtectedRoute>
+              }
+            />
                   <Route
                     path="/admin/test"
                     element={
