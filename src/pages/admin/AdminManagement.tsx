@@ -1423,210 +1423,6 @@ const AdminManagement = () => {
                         </TableRow>
                       ))}
                     </TableBody>
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from "@/components/ui";
-import {
-  Building2,
-  Edit,
-  FileText,
-  Package,
-  Plus,
-  Settings,
-  ShoppingCart,
-  Tag,
-  Trash2,
-  Users,
-  Ticket,
-} from "lucide-react";
-
-import { useAdmin } from "@/hooks/useAdmin";
-import { useDialog } from "@/hooks/useDialog";
-
-const AdminManagement = () => {
-  const { t } = useTranslation();
-  const {
-    products,
-    categoryList,
-    brandList,
-    coupons,
-    orders,
-    fetchProducts,
-    fetchCategories,
-    fetchBrands,
-    fetchCoupons,
-    fetchOrders,
-    deleteProduct,
-    deleteCategory,
-    deleteBrand,
-    deleteCoupon,
-  } = useAdmin();
-  const {
-    isDialogOpen,
-    setIsDialogOpen,
-    editingItem,
-    setEditingItem,
-    currentSection,
-    setCurrentSection,
-    formData,
-    setFormData,
-    renderForm,
-    handleSave,
-  } = useDialog();
-
-  const [activeTab, setActiveTab] = useState("products");
-
-  useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-    fetchBrands();
-    fetchCoupons();
-    fetchOrders();
-  }, []);
-
-  const openDialog = (item: any, section: string) => {
-    setEditingItem(item);
-    setCurrentSection(section);
-    setIsDialogOpen(true);
-  };
-
-  const viewOrder = (order: any) => {
-    console.log(order);
-  };
-
-  return (
-    <div className="container">
-      <main className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
-          <p className="text-muted-foreground">{t("admin.welcome")}</p>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7 mb-8">
-            <TabsTrigger value="products" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              {t("admin.products")}
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-2">
-              <Tag className="h-4 w-4" />
-              {t("admin.categories")}
-            </TabsTrigger>
-            <TabsTrigger value="brands" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              {t("admin.brands")}
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              {t("admin.orders")}
-            </TabsTrigger>
-            <TabsTrigger value="customers" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              {t("admin.customers")}
-            </TabsTrigger>
-            <TabsTrigger value="coupons" className="flex items-center gap-2">
-              <Ticket className="h-4 w-4" />
-              {t("admin.coupons")}
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              {t("admin.settings")}
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Products Tab */}
-          <TabsContent value="products">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>{t("admin.products")}</CardTitle>
-                  <Button onClick={() => openDialog(null, "products")}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t("admin.addNew")}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("admin.productName")}</TableHead>
-                        <TableHead>{t("admin.category")}</TableHead>
-                        <TableHead>{t("admin.brand")}</TableHead>
-                        <TableHead>{t("admin.price")}</TableHead>
-                        <TableHead>{t("admin.stock")}</TableHead>
-                        <TableHead>{t("admin.status")}</TableHead>
-                        <TableHead>{t("admin.actions")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {products.map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell className="font-medium">
-                            {product.name}
-                          </TableCell>
-                          <TableCell>
-                            {product.categories?.name || "N/A"}
-                          </TableCell>
-                          <TableCell>{product.brands?.name || "N/A"}</TableCell>
-                          <TableCell>${product.price}</TableCell>
-                          <TableCell>{product.stock_quantity || 0}</TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                product.is_active
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {product.is_active
-                                ? t("admin.active")
-                                : t("admin.inactive")}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  openDialog(product, "products")
-                                }
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => deleteProduct(product.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
                   </Table>
                 </div>
               </CardContent>
@@ -1638,11 +1434,48 @@ const AdminManagement = () => {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle>{t("admin.categories")}</CardTitle>
-                  <Button onClick={() => openDialog(null, "categories")}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t("admin.addNew")}
-                  </Button>
+                  <CardTitle>Categories</CardTitle>
+                  <Dialog
+                    open={isDialogOpen}
+                    onOpenChange={(open) => {
+                      setIsDialogOpen(open);
+                      if (!open) resetForm();
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        onClick={() => {
+                          setCurrentSection("categories");
+                          resetForm();
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Category
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingItem ? "Edit Category" : "Add Category"}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        {renderCategoryForm()}
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit">
+                            {editingItem ? "Update" : "Create"}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1650,10 +1483,10 @@ const AdminManagement = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>{t("admin.name")}</TableHead>
-                        <TableHead>{t("admin.description")}</TableHead>
-                        <TableHead>{t("admin.status")}</TableHead>
-                        <TableHead>{t("admin.actions")}</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Display Order</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1662,35 +1495,36 @@ const AdminManagement = () => {
                           <TableCell className="font-medium">
                             {category.name}
                           </TableCell>
-                          <TableCell>{category.description || "N/A"}</TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                category.display_order !== null
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {category.display_order !== null
-                                ? t("admin.active")
-                                : t("admin.inactive")}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
+                          <TableCell>{category.description || "-"}</TableCell>
+                          <TableCell>{category.display_order || "-"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() =>
-                                  openDialog(category, "categories")
-                                }
+                                onClick={() => {
+                                  setEditingItem(category);
+                                  setFormData({
+                                    name: category.name,
+                                    description: category.description || "",
+                                    display_order: category.display_order,
+                                  });
+                                  setCurrentSection("categories");
+                                  setIsDialogOpen(true);
+                                }}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => deleteCategory(category.id)}
+                                onClick={() =>
+                                  handleDelete(
+                                    "categories",
+                                    category.id,
+                                    category.name
+                                  )
+                                }
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1710,11 +1544,48 @@ const AdminManagement = () => {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle>{t("admin.brands")}</CardTitle>
-                  <Button onClick={() => openDialog(null, "brands")}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t("admin.addNew")}
-                  </Button>
+                  <CardTitle>Brands</CardTitle>
+                  <Dialog
+                    open={isDialogOpen}
+                    onOpenChange={(open) => {
+                      setIsDialogOpen(open);
+                      if (!open) resetForm();
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        onClick={() => {
+                          setCurrentSection("brands");
+                          resetForm();
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Brand
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingItem ? "Edit Brand" : "Add Brand"}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        {renderBrandForm()}
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit">
+                            {editingItem ? "Update" : "Create"}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1722,10 +1593,9 @@ const AdminManagement = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>{t("admin.name")}</TableHead>
-                        <TableHead>{t("admin.description")}</TableHead>
-                        <TableHead>{t("admin.status")}</TableHead>
-                        <TableHead>{t("admin.actions")}</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1734,33 +1604,298 @@ const AdminManagement = () => {
                           <TableCell className="font-medium">
                             {brand.name}
                           </TableCell>
-                          <TableCell>{brand.description || "N/A"}</TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                brand.is_active
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {brand.is_active
-                                ? t("admin.active")
-                                : t("admin.inactive")}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
+                          <TableCell>{brand.description || "-"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => openDialog(brand, "brands")}
+                                onClick={() => {
+                                  setEditingItem(brand);
+                                  setFormData({
+                                    name: brand.name,
+                                    description: brand.description || "",
+                                  });
+                                  setCurrentSection("brands");
+                                  setIsDialogOpen(true);
+                                }}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => deleteBrand(brand.id)}
+                                onClick={() =>
+                                  handleDelete("brands", brand.id, brand.name)
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Coupons Tab */}
+          <TabsContent value="coupons">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Coupons</CardTitle>
+                  <Dialog
+                    open={isDialogOpen}
+                    onOpenChange={(open) => {
+                      setIsDialogOpen(open);
+                      if (!open) resetForm();
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        onClick={() => {
+                          setCurrentSection("coupons");
+                          resetForm();
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Coupon
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingItem ? "Edit Coupon" : "Add Coupon"}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        {renderCouponForm()}
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit">
+                            {editingItem ? "Update" : "Create"}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Value</TableHead>
+                        <TableHead>Valid Until</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {coupons.map((coupon) => (
+                        <TableRow key={coupon.id}>
+                          <TableCell className="font-medium">
+                            {coupon.code}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {coupon.discount_type}
+                          </TableCell>
+                          <TableCell>
+                            {coupon.discount_type === "percentage"
+                              ? `${coupon.discount_value}%`
+                              : `$${coupon.discount_value}`}
+                          </TableCell>
+                          <TableCell>
+                            {coupon.valid_until
+                              ? new Date(coupon.valid_until).toLocaleDateString()
+                              : "-"}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                coupon.is_active
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {coupon.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingItem(coupon);
+                                  setFormData({
+                                    code: coupon.code,
+                                    discount_type: coupon.discount_type,
+                                    discount_value: coupon.discount_value,
+                                    minimum_purchase_amount:
+                                      coupon.minimum_purchase_amount,
+                                    valid_from: coupon.valid_from,
+                                    valid_until: coupon.valid_until,
+                                    usage_limit: coupon.usage_limit,
+                                    is_active: coupon.is_active,
+                                  });
+                                  setCurrentSection("coupons");
+                                  setIsDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleDelete("coupons", coupon.id, coupon.code)
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Shipping & Tax Tab */}
+          <TabsContent value="shipping-tax">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Shipping & Tax Configurations</CardTitle>
+                  <Dialog
+                    open={isDialogOpen}
+                    onOpenChange={(open) => {
+                      setIsDialogOpen(open);
+                      if (!open) resetForm();
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        onClick={() => {
+                          setCurrentSection("shipping-tax");
+                          resetForm();
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Configuration
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingItem
+                            ? "Edit Configuration"
+                            : "Add Configuration"}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        {renderShippingTaxForm()}
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit">
+                            {editingItem ? "Update" : "Create"}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Rate/Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {shippingTaxConfigs.map((config) => (
+                        <TableRow key={config.id}>
+                          <TableCell className="font-medium capitalize">
+                            {config.type}
+                          </TableCell>
+                          <TableCell>{config.name}</TableCell>
+                          <TableCell>
+                            {config.type === "tax"
+                              ? `${config.rate}%`
+                              : `$${config.amount}`}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                config.is_active
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {config.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingItem(config);
+                                  setFormData({
+                                    type: config.type,
+                                    name: config.name,
+                                    rate: config.rate,
+                                    amount: config.amount,
+                                    min_order_value: config.min_order_value,
+                                    max_order_value: config.max_order_value,
+                                    is_active: config.is_active,
+                                  });
+                                  setCurrentSection("shipping-tax");
+                                  setIsDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleDelete(
+                                    "shipping-tax",
+                                    config.id,
+                                    config.name
+                                  )
+                                }
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1779,21 +1914,19 @@ const AdminManagement = () => {
           <TabsContent value="orders">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>{t("admin.orders")}</CardTitle>
-                </div>
+                <CardTitle>Orders</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>{t("admin.orderNumber")}</TableHead>
-                        <TableHead>{t("admin.customer")}</TableHead>
-                        <TableHead>{t("admin.date")}</TableHead>
-                        <TableHead>{t("admin.amount")}</TableHead>
-                        <TableHead>{t("admin.status")}</TableHead>
-                        <TableHead>{t("admin.actions")}</TableHead>
+                        <TableHead>Order #</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1804,40 +1937,32 @@ const AdminManagement = () => {
                           </TableCell>
                           <TableCell>
                             {typeof order.users === "object" &&
-                            order.users !== null &&
-                            !("error" in order.users)
+                            order.users &&
+                            "email" in order.users
                               ? order.users.email
-                              : "N/A"}
+                              : "-"}
                           </TableCell>
                           <TableCell>
                             {new Date(order.created_at).toLocaleDateString()}
                           </TableCell>
-                          <TableCell>${order.total_amount}</TableCell>
                           <TableCell>
                             <span
                               className={`px-2 py-1 rounded-full text-xs ${
-                                order.status === "delivered"
+                                order.status === "completed"
                                   ? "bg-green-100 text-green-800"
-                                  : order.status === "shipped"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : order.status === "processing"
+                                  : order.status === "pending"
                                   ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-gray-100 text-gray-800"
+                                  : "bg-red-100 text-red-800"
                               }`}
                             >
                               {order.status}
                             </span>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => viewOrder(order)}
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                            </div>
+                          <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm">
+                              View Details
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1848,98 +1973,43 @@ const AdminManagement = () => {
             </Card>
           </TabsContent>
 
-          {/* Customers Tab */}
-          <TabsContent value="customers">
+          {/* Invoices Tab */}
+          <TabsContent value="invoices">
             <Card>
               <CardHeader>
-                <CardTitle>{t("admin.customers")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>{t("admin.noCustomers")}</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Coupons Tab */}
-          <TabsContent value="coupons">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>{t("admin.coupons")}</CardTitle>
-                  <Button onClick={() => openDialog(null, "coupons")}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t("admin.addNew")}
-                  </Button>
-                </div>
+                <CardTitle>Invoices</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>{t("admin.code")}</TableHead>
-                        <TableHead>{t("admin.discount")}</TableHead>
-                        <TableHead>{t("admin.validFrom")}</TableHead>
-                        <TableHead>{t("admin.validUntil")}</TableHead>
-                        <TableHead>{t("admin.status")}</TableHead>
-                        <TableHead>{t("admin.actions")}</TableHead>
+                        <TableHead>Invoice #</TableHead>
+                        <TableHead>Order #</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {coupons.map((coupon) => (
-                        <TableRow key={coupon.id}>
+                      {invoices.map((invoice) => (
+                        <TableRow key={invoice.id}>
                           <TableCell className="font-medium">
-                            {coupon.code}
+                            {invoice.invoice_number}
                           </TableCell>
                           <TableCell>
-                            {coupon.discount_type === "percentage"
-                              ? `${coupon.discount_value}%`
-                              : `$${coupon.discount_value}`}
+                            {invoice.orders?.order_number || "-"}
                           </TableCell>
                           <TableCell>
-                            {coupon.valid_from
-                              ? new Date(
-                                  coupon.valid_from
-                                ).toLocaleDateString()
-                              : "N/A"}
+                            {new Date(invoice.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
-                            {coupon.valid_until
-                              ? new Date(
-                                  coupon.valid_until
-                                ).toLocaleDateString()
-                              : "N/A"}
+                            ${invoice.total_amount.toFixed(2)}
                           </TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                coupon.is_active
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {coupon.is_active
-                                ? t("admin.active")
-                                : t("admin.inactive")}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openDialog(coupon, "coupons")}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => deleteCoupon(coupon.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm">
+                              Download PDF
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1949,43 +2019,7 @@ const AdminManagement = () => {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("admin.settings")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>{t("admin.settings")}</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
-
-        {/* Dialog for editing/creating items */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingItem
-                  ? t("admin.edit") + " " + t(`admin.${currentSection.slice(0, -1)}`)
-                  : t("admin.create") + " " + t(`admin.${currentSection.slice(0, -1)}`)}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {renderForm()}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                {t("admin.cancel")}
-              </Button>
-              <Button onClick={handleSave}>
-                {editingItem ? t("admin.update") : t("admin.create")}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );
