@@ -379,6 +379,11 @@ const Shop = () => {
       }
     } catch (error) {
       console.error("Failed to load products:", error);
+      setProducts([]);
+      // Don't show error toast for empty results, only for actual errors
+      if (error && (error as any).message) {
+        console.error("Product load error:", (error as any).message);
+      }
     } finally {
       setLoading(false);
     }

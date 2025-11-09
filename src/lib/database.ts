@@ -658,7 +658,7 @@ export const searchProducts = async (filters: {
       *,
       brands!products_brand_id_fkey(name),
       categories!products_category_id_fkey(name, slug),
-      reviews (rating)
+      reviews!fk_reviews_product(rating)
     `)
     .eq('is_active', true);
 
