@@ -214,7 +214,7 @@ export const getOrdersByUserId = async (userId: string) => {
     .from('orders')
     .select(`
       *,
-      order_items (
+      order_items!fk_order_items_order (
         *,
         products!fk_order_items_product (
           id,

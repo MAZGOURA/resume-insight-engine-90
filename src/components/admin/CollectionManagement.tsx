@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload } from "lucide-react";
 import {
   getCollections,
   createCollection,
@@ -55,6 +55,8 @@ export const CollectionManagement = () => {
     null
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -162,6 +164,22 @@ export const CollectionManagement = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        setFormData({ ...formData, image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -172,6 +190,7 @@ export const CollectionManagement = () => {
       sort_order: 0,
     });
     setEditingCollection(null);
+    setImagePreview(null);
   };
 
   const openCreateDialog = () => {
@@ -189,6 +208,7 @@ export const CollectionManagement = () => {
       is_active: collection.is_active,
       sort_order: collection.sort_order,
     });
+    setImagePreview(collection.image || null);
     setIsDialogOpen(true);
   };
 
@@ -279,15 +299,46 @@ export const CollectionManagement = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="image">{t("Image URL")}</Label>
-                    <Input
-                      id="image"
-                      value={formData.image}
-                      onChange={(e) =>
-                        setFormData({ ...formData, image: e.target.value })
-                      }
-                      placeholder={t("https://example.com/image.jpg")}
-                    />
+                    <Label htmlFor="image">{t("Image")}</Label>
+                    <div className="space-y-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={triggerFileInput}
+                        className="w-full"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {t("Upload Image")}
+                      </Button>
+                      <Input
+                        id="image"
+                        value={formData.image}
+                        onChange={(e) => {
+                          setFormData({ ...formData, image: e.target.value });
+                          setImagePreview(e.target.value);
+                        }}
+                        placeholder={t("Or paste image URL")}
+                      />
+                      {imagePreview && (
+                        <div className="relative w-full h-32 border rounded overflow-hidden">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.svg";
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="sort_order">{t("Sort Order")}</Label>

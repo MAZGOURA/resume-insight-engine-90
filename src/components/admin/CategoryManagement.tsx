@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload } from "lucide-react";
 import {
   getCategories,
   createCategory,
@@ -51,6 +51,8 @@ export const CategoryManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -158,6 +160,22 @@ export const CategoryManagement = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        setFormData({ ...formData, image_url: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -168,6 +186,7 @@ export const CategoryManagement = () => {
       display_order: 0,
     });
     setEditingCategory(null);
+    setImagePreview(null);
   };
 
   const openCreateDialog = () => {
@@ -185,6 +204,7 @@ export const CategoryManagement = () => {
       is_active: category.is_active,
       display_order: category.display_order,
     });
+    setImagePreview(category.image_url || null);
     setIsDialogOpen(true);
   };
 
@@ -275,15 +295,46 @@ export const CategoryManagement = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="image_url">{t("Image URL")}</Label>
-                    <Input
-                      id="image_url"
-                      value={formData.image_url}
-                      onChange={(e) =>
-                        setFormData({ ...formData, image_url: e.target.value })
-                      }
-                      placeholder={t("https://example.com/image.jpg")}
-                    />
+                    <Label htmlFor="image_url">{t("Image")}</Label>
+                    <div className="space-y-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={triggerFileInput}
+                        className="w-full"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {t("Upload Image")}
+                      </Button>
+                      <Input
+                        id="image_url"
+                        value={formData.image_url}
+                        onChange={(e) => {
+                          setFormData({ ...formData, image_url: e.target.value });
+                          setImagePreview(e.target.value);
+                        }}
+                        placeholder={t("Or paste image URL")}
+                      />
+                      {imagePreview && (
+                        <div className="relative w-full h-32 border rounded overflow-hidden">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.svg";
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="display_order">{t("Display Order")}</Label>
