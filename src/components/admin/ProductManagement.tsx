@@ -273,7 +273,7 @@ export const ProductManagement = () => {
       }
 
       // Handle collections
-      if (savedProduct && formData.collections.length > 0) {
+      if (savedProduct) {
         // Get existing collections
         const existingCollections = await getProductCollections(
           savedProduct.id
@@ -306,7 +306,7 @@ export const ProductManagement = () => {
       }
 
       // Handle categories (similar to collections)
-      if (savedProduct && formData.categories.length > 0) {
+      if (savedProduct) {
         const existingCategories = await getProductCategories(savedProduct.id);
         const existingCategoryIds = existingCategories.map(
           (pc: any) => pc.category_id
