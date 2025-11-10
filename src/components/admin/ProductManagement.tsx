@@ -36,12 +36,10 @@ import {
   getCategories,
   getBrands,
   getCollections,
-  addProductToCollection,
-  removeProductFromCollection,
   getProductCollections,
   getProductCategories,
-  addProductToCategory,
-  removeProductFromCategory,
+  syncProductCollections,
+  syncProductCategories,
 } from "@/lib/database";
 import { Product } from "@/lib/types";
 import {
@@ -272,67 +270,10 @@ export const ProductManagement = () => {
         toast.success("Product created successfully");
       }
 
-      // Handle collections
+      // Sync collections and categories using the new helper functions
       if (savedProduct) {
-        // Get existing collections
-        const existingCollections = await getProductCollections(
-          savedProduct.id
-        );
-        const existingCollectionIds = existingCollections.map(
-          (pc: any) => pc.collection_id
-        );
-
-        // Add new collections
-        for (const collectionId of formData.collections) {
-          if (!existingCollectionIds.includes(collectionId)) {
-            try {
-              await addProductToCollection(savedProduct.id, collectionId);
-            } catch (error) {
-              console.error("Error adding product to collection:", error);
-            }
-          }
-        }
-
-        // Remove collections that are no longer selected
-        for (const collectionId of existingCollectionIds) {
-          if (!formData.collections.includes(collectionId)) {
-            try {
-              await removeProductFromCollection(savedProduct.id, collectionId);
-            } catch (error) {
-              console.error("Error removing product from collection:", error);
-            }
-          }
-        }
-      }
-
-      // Handle categories (similar to collections)
-      if (savedProduct) {
-        const existingCategories = await getProductCategories(savedProduct.id);
-        const existingCategoryIds = existingCategories.map(
-          (pc: any) => pc.category_id
-        );
-
-        // Add new categories
-        for (const categoryId of formData.categories) {
-          if (!existingCategoryIds.includes(categoryId)) {
-            try {
-              await addProductToCategory(savedProduct.id, categoryId);
-            } catch (error) {
-              console.error("Error adding product to category:", error);
-            }
-          }
-        }
-
-        // Remove categories that are no longer selected
-        for (const categoryId of existingCategoryIds) {
-          if (!formData.categories.includes(categoryId)) {
-            try {
-              await removeProductFromCategory(savedProduct.id, categoryId);
-            } catch (error) {
-              console.error("Error removing product from category:", error);
-            }
-          }
-        }
+        await syncProductCollections(savedProduct.id, formData.collections);
+        await syncProductCategories(savedProduct.id, formData.categories);
       }
 
       // Reset form and refresh products
@@ -340,7 +281,8 @@ export const ProductManagement = () => {
       loadProducts();
     } catch (error) {
       console.error("Failed to save product:", error);
-      toast.error("Failed to save product");
+      const errorMessage = error instanceof Error ? error.message : "Failed to save product";
+      toast.error(errorMessage);
     } finally {
       setUploading(false);
     }

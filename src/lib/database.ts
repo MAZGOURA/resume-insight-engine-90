@@ -10,6 +10,69 @@ type Profile = Database['public']['Tables']['profiles']['Row'];
 type Order = Database['public']['Tables']['orders']['Row'];
 type OrderItem = Database['public']['Tables']['order_items']['Row'];
 
+// ============= SLUG HELPERS =============
+
+/**
+ * Convert a string to a URL-friendly slug
+ */
+export const slugify = (str: string): string => {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove non-alphanumeric chars except spaces and hyphens
+    .replace(/\s+/g, '-')         // Replace spaces with hyphens
+    .replace(/-+/g, '-')          // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, '');     // Remove leading/trailing hyphens
+};
+
+/**
+ * Ensure a slug is unique by appending a number if necessary
+ */
+export const ensureUniqueSlug = async (
+  table: 'products' | 'categories' | 'collections',
+  baseSlug: string,
+  excludeId?: string
+): Promise<string> => {
+  let slug = slugify(baseSlug);
+  
+  // Query existing slugs that start with this base
+  const { data, error } = await supabase
+    .from(table)
+    .select('id, slug')
+    .ilike('slug', `${slug}%`);
+
+  if (error) {
+    console.error(`Error checking slug uniqueness:`, error);
+    return slug;
+  }
+
+  if (!data || data.length === 0) {
+    return slug;
+  }
+
+  // Build a set of existing slugs, excluding the current item if editing
+  const existingSlugs = new Set(
+    data
+      .filter(item => !excludeId || item.id !== excludeId)
+      .map(item => item.slug)
+  );
+
+  // If the base slug itself is available, use it
+  if (!existingSlugs.has(slug)) {
+    return slug;
+  }
+
+  // Otherwise, append -2, -3, etc. until we find an available slug
+  let counter = 2;
+  let candidateSlug = `${slug}-${counter}`;
+  while (existingSlugs.has(candidateSlug)) {
+    counter++;
+    candidateSlug = `${slug}-${counter}`;
+  }
+
+  return candidateSlug;
+};
+
 // Product operations
 // Optimized with pagination support - can be called with limit for better performance
 export const getProducts = async (category?: string, search?: string, limit?: number) => {
@@ -273,10 +336,13 @@ export const updateOrderStatus = async (orderId: string, status: 'pending' | 'pr
 // Admin operations
 export const createProduct = async (product: any) => {
   try {
+    // Generate unique slug
+    const slug = await ensureUniqueSlug('products', product.slug || product.name);
+    
     // Prepare data with correct field mappings
     const productData = {
       name: product.name,
-      slug: product.slug || product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      slug: slug,
       description: product.description,
       short_description: product.short_description || product.description?.substring(0, 160),
       price: product.price,
@@ -318,8 +384,13 @@ export const updateProduct = async (id: string, updates: any) => {
       updated_at: new Date().toISOString(),
     };
 
+    // Only update slug if name or slug is explicitly changed
+    if (updates.name || updates.slug) {
+      const baseForSlug = updates.slug || updates.name;
+      productData.slug = await ensureUniqueSlug('products', baseForSlug, id);
+    }
+
     if (updates.name) productData.name = updates.name;
-    if (updates.slug) productData.slug = updates.slug;
     if (updates.description) productData.description = updates.description;
     if (updates.short_description) productData.short_description = updates.short_description;
     if (updates.price !== undefined) productData.price = updates.price;
@@ -957,6 +1028,158 @@ export const getCollections = async () => {
   return data || [];
 };
 
+// ============= ASSOCIATION SYNC HELPERS =============
+
+/**
+ * Sync product collections - adds new associations and removes old ones
+ */
+export const syncProductCollections = async (
+  productId: string,
+  collectionIds: string[]
+): Promise<void> => {
+  try {
+    // Get existing collections
+    const { data: existing, error: fetchError } = await supabase
+      .from('product_collections')
+      .select('collection_id')
+      .eq('product_id', productId);
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch existing collections: ${fetchError.message}`);
+    }
+
+    const existingIds = new Set((existing || []).map(item => item.collection_id));
+    const selectedIds = new Set(collectionIds);
+
+    // Determine what to add and what to remove
+    const toAdd = collectionIds.filter(id => !existingIds.has(id));
+    const toRemove = (existing || [])
+      .map(item => item.collection_id)
+      .filter(id => !selectedIds.has(id));
+
+    // Add new associations
+    if (toAdd.length > 0) {
+      const insertData = toAdd.map(collectionId => ({
+        product_id: productId,
+        collection_id: collectionId,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('product_collections')
+        .upsert(insertData, {
+          onConflict: 'product_id,collection_id',
+          ignoreDuplicates: true,
+        });
+
+      if (insertError) {
+        throw new Error(`Failed to add collections: ${insertError.message}`);
+      }
+    }
+
+    // Remove old associations
+    if (collectionIds.length === 0) {
+      // Remove all if none selected
+      const { error: deleteError } = await supabase
+        .from('product_collections')
+        .delete()
+        .eq('product_id', productId);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove all collections: ${deleteError.message}`);
+      }
+    } else if (toRemove.length > 0) {
+      // Remove specific ones
+      const { error: deleteError } = await supabase
+        .from('product_collections')
+        .delete()
+        .eq('product_id', productId)
+        .in('collection_id', toRemove);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove collections: ${deleteError.message}`);
+      }
+    }
+  } catch (error) {
+    console.error("Sync collections error:", error);
+    throw error instanceof Error ? error : new Error("Failed to sync collections");
+  }
+};
+
+/**
+ * Sync product categories - adds new associations and removes old ones
+ */
+export const syncProductCategories = async (
+  productId: string,
+  categoryIds: string[]
+): Promise<void> => {
+  try {
+    // Get existing categories
+    const { data: existing, error: fetchError } = await supabase
+      .from('product_categories')
+      .select('category_id')
+      .eq('product_id', productId);
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch existing categories: ${fetchError.message}`);
+    }
+
+    const existingIds = new Set((existing || []).map(item => item.category_id));
+    const selectedIds = new Set(categoryIds);
+
+    // Determine what to add and what to remove
+    const toAdd = categoryIds.filter(id => !existingIds.has(id));
+    const toRemove = (existing || [])
+      .map(item => item.category_id)
+      .filter(id => !selectedIds.has(id));
+
+    // Add new associations
+    if (toAdd.length > 0) {
+      const insertData = toAdd.map(categoryId => ({
+        product_id: productId,
+        category_id: categoryId,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('product_categories')
+        .upsert(insertData, {
+          onConflict: 'product_id,category_id',
+          ignoreDuplicates: true,
+        });
+
+      if (insertError) {
+        throw new Error(`Failed to add categories: ${insertError.message}`);
+      }
+    }
+
+    // Remove old associations
+    if (categoryIds.length === 0) {
+      // Remove all if none selected
+      const { error: deleteError } = await supabase
+        .from('product_categories')
+        .delete()
+        .eq('product_id', productId);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove all categories: ${deleteError.message}`);
+      }
+    } else if (toRemove.length > 0) {
+      // Remove specific ones
+      const { error: deleteError } = await supabase
+        .from('product_categories')
+        .delete()
+        .eq('product_id', productId)
+        .in('category_id', toRemove);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove categories: ${deleteError.message}`);
+      }
+    }
+  } catch (error) {
+    console.error("Sync categories error:", error);
+    throw error instanceof Error ? error : new Error("Failed to sync categories");
+  }
+};
+
 // Product Collections operations
 export const addProductToCollection = async (productId: string, collectionId: string) => {
   const { data, error } = await supabase
@@ -1078,24 +1301,33 @@ export const createCategory = async (
   isActive: boolean = true,
   displayOrder: number = 0
 ) => {
-  const { data, error } = await supabase
-    .from('categories')
-    .insert({
-      name,
-      slug,
-      description,
-      image_url,
-      is_active: isActive,
-      display_order: displayOrder,
-    })
-    .select()
-    .single();
+  try {
+    // Generate unique slug
+    const effectiveSlug = await ensureUniqueSlug('categories', slug || name);
+    
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({
+        name,
+        slug: effectiveSlug,
+        description,
+        image_url,
+        is_active: isActive,
+        display_order: displayOrder,
+      })
+      .select()
+      .single();
 
-  if (error) {
-    throw new Error(`Failed to create category: ${error.message}`);
+    if (error) {
+      console.error("Create category error:", error);
+      throw new Error(`Failed to create category: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Create category error:", error);
+    throw error instanceof Error ? error : new Error("Failed to create category");
   }
-
-  return data;
 };
 
 export const updateCategory = async (
@@ -1109,18 +1341,34 @@ export const updateCategory = async (
     display_order?: number;
   }
 ) => {
-  const { data, error } = await supabase
-    .from('categories')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+  try {
+    const updateData = { ...updates };
+    
+    // Only update slug if name or slug is explicitly changed
+    if (updates.name || updates.slug) {
+      const baseForSlug = updates.slug || updates.name;
+      if (baseForSlug) {
+        updateData.slug = await ensureUniqueSlug('categories', baseForSlug, id);
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('categories')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
 
-  if (error) {
-    throw new Error(`Failed to update category: ${error.message}`);
+    if (error) {
+      console.error("Update category error:", error);
+      throw new Error(`Failed to update category: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Update category error:", error);
+    throw error instanceof Error ? error : new Error("Failed to update category");
   }
-
-  return data;
 };
 
 export const deleteCategory = async (id: string) => {
@@ -1143,24 +1391,33 @@ export const createCollection = async (
   isActive: boolean = true,
   sortOrder: number = 0
 ) => {
-  const { data, error } = await supabase
-    .from('collections')
-    .insert({
-      name,
-      slug,
-      description,
-      image,
-      is_active: isActive,
-      sort_order: sortOrder,
-    })
-    .select()
-    .single();
+  try {
+    // Generate unique slug
+    const effectiveSlug = await ensureUniqueSlug('collections', slug || name);
+    
+    const { data, error } = await supabase
+      .from('collections')
+      .insert({
+        name,
+        slug: effectiveSlug,
+        description,
+        image,
+        is_active: isActive,
+        sort_order: sortOrder,
+      })
+      .select()
+      .single();
 
-  if (error) {
-    throw new Error(`Failed to create collection: ${error.message}`);
+    if (error) {
+      console.error("Create collection error:", error);
+      throw new Error(`Failed to create collection: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Create collection error:", error);
+    throw error instanceof Error ? error : new Error("Failed to create collection");
   }
-
-  return data;
 };
 
 export const updateCollection = async (
@@ -1174,18 +1431,34 @@ export const updateCollection = async (
     sort_order?: number;
   }
 ) => {
-  const { data, error } = await supabase
-    .from('collections')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+  try {
+    const updateData = { ...updates };
+    
+    // Only update slug if name or slug is explicitly changed
+    if (updates.name || updates.slug) {
+      const baseForSlug = updates.slug || updates.name;
+      if (baseForSlug) {
+        updateData.slug = await ensureUniqueSlug('collections', baseForSlug, id);
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('collections')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
 
-  if (error) {
-    throw new Error(`Failed to update collection: ${error.message}`);
+    if (error) {
+      console.error("Update collection error:", error);
+      throw new Error(`Failed to update collection: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Update collection error:", error);
+    throw error instanceof Error ? error : new Error("Failed to update collection");
   }
-
-  return data;
 };
 
 export const deleteCollection = async (id: string) => {

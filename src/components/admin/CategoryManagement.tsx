@@ -113,7 +113,8 @@ export const CategoryManagement = () => {
       resetForm();
       fetchCategories();
     } catch (error) {
-      toast.error(t("Failed to create category"));
+      const errorMessage = error instanceof Error ? error.message : t("Failed to create category");
+      toast.error(errorMessage);
       console.error("Error creating category:", error);
     }
   };
@@ -135,7 +136,8 @@ export const CategoryManagement = () => {
       resetForm();
       fetchCategories();
     } catch (error) {
-      toast.error(t("Failed to update category"));
+      const errorMessage = error instanceof Error ? error.message : t("Failed to update category");
+      toast.error(errorMessage);
       console.error("Error updating category:", error);
     }
   };

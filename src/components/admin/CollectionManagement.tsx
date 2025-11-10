@@ -117,7 +117,8 @@ export const CollectionManagement = () => {
       resetForm();
       fetchCollections();
     } catch (error) {
-      toast.error(t("Failed to create collection"));
+      const errorMessage = error instanceof Error ? error.message : t("Failed to create collection");
+      toast.error(errorMessage);
       console.error("Error creating collection:", error);
     }
   };
@@ -139,7 +140,8 @@ export const CollectionManagement = () => {
       resetForm();
       fetchCollections();
     } catch (error) {
-      toast.error(t("Failed to update collection"));
+      const errorMessage = error instanceof Error ? error.message : t("Failed to update collection");
+      toast.error(errorMessage);
       console.error("Error updating collection:", error);
     }
   };
