@@ -34,6 +34,7 @@ export default function DashboardV2() {
     products: 0,
   });
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<Array<{ name: string; value: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -110,6 +111,33 @@ export default function DashboardV2() {
       })) || [];
 
       setRecentActivities(recentActivities);
+
+      // Calculate last 7 days revenue with actual order data
+      const last7Days = [];
+      const today = new Date();
+      
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
+        const nextDay = new Date(date);
+        nextDay.setDate(nextDay.getDate() + 1);
+        
+        const dayName = date.toLocaleDateString('fr-FR', { weekday: 'short' });
+        
+        // Calculate revenue for this day from orders
+        const dayRevenue = orders?.filter(o => {
+          const orderDate = new Date(o.created_at);
+          return orderDate >= date && orderDate < nextDay;
+        }).reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+        
+        last7Days.push({
+          name: dayName,
+          value: dayRevenue
+        });
+      }
+      
+      setRevenueData(last7Days);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -117,27 +145,6 @@ export default function DashboardV2() {
       setLoading(false);
     }
   };
-
-  // Calculate last 7 days revenue
-  const getLast7DaysRevenue = () => {
-    const last7Days = [];
-    const today = new Date();
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dayName = date.toLocaleDateString('fr-FR', { weekday: 'short' });
-      
-      last7Days.push({
-        name: dayName,
-        value: 0
-      });
-    }
-    
-    return last7Days;
-  };
-
-  const revenueData = getLast7DaysRevenue();
 
   if (loading) {
     return (
