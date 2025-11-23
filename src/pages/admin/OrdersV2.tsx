@@ -225,6 +225,14 @@ export default function OrdersV2() {
           open={!!selectedOrder}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
           order={selectedOrder}
+          onOrderUpdate={() => {
+            fetchOrders();
+            if (selectedOrder) {
+              // Refresh the selected order data
+              const updated = orders.find(o => o.id === selectedOrder.id);
+              if (updated) setSelectedOrder(updated);
+            }
+          }}
         />
       </div>
     </AdminLayoutV2>
