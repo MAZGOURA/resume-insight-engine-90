@@ -1,0 +1,1473 @@
+import { supabase } from "@/integrations/supabase/client";
+import { getCityNameById } from "@/lib/shipping";
+import { CartItem } from "@/lib/types";
+
+import { Database } from '@/integrations/supabase/types';
+
+// Define types for our database operations
+type Review = Database['public']['Tables']['reviews']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type Order = Database['public']['Tables']['orders']['Row'];
+type OrderItem = Database['public']['Tables']['order_items']['Row'];
+
+// ============= SLUG HELPERS =============
+
+/**
+ * Convert a string to a URL-friendly slug
+ */
+export const slugify = (str: string): string => {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove non-alphanumeric chars except spaces and hyphens
+    .replace(/\s+/g, '-')         // Replace spaces with hyphens
+    .replace(/-+/g, '-')          // Replace multiple hyphens with single hyphen
+    .replace(/^-+|-+$/g, '');     // Remove leading/trailing hyphens
+};
+
+/**
+ * Ensure a slug is unique by appending a number if necessary
+ */
+export const ensureUniqueSlug = async (
+  table: 'products' | 'categories' | 'collections',
+  baseSlug: string,
+  excludeId?: string
+): Promise<string> => {
+  let slug = slugify(baseSlug);
+  
+  // Query existing slugs that start with this base
+  const { data, error } = await supabase
+    .from(table)
+    .select('id, slug')
+    .ilike('slug', `${slug}%`);
+
+  if (error) {
+    console.error(`Error checking slug uniqueness:`, error);
+    return slug;
+  }
+
+  if (!data || data.length === 0) {
+    return slug;
+  }
+
+  // Build a set of existing slugs, excluding the current item if editing
+  const existingSlugs = new Set(
+    data
+      .filter(item => !excludeId || item.id !== excludeId)
+      .map(item => item.slug)
+  );
+
+  // If the base slug itself is available, use it
+  if (!existingSlugs.has(slug)) {
+    return slug;
+  }
+
+  // Otherwise, append -2, -3, etc. until we find an available slug
+  let counter = 2;
+  let candidateSlug = `${slug}-${counter}`;
+  while (existingSlugs.has(candidateSlug)) {
+    counter++;
+    candidateSlug = `${slug}-${counter}`;
+  }
+
+  return candidateSlug;
+};
+
+// Product operations
+// Optimized with pagination support - can be called with limit for better performance
+export const getProducts = async (category?: string, search?: string, limit?: number) => {
+  let query = supabase
+    .from('products')
+    .select(`
+      *,
+      brands(name),
+      categories(name, slug)
+    `)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  // Apply limit if provided for better performance with large datasets
+  if (limit) {
+    query = query.limit(limit);
+  }
+
+  if (category) {
+    query = query.eq('category_id', category);
+  }
+
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch products: ${error.message}`);
+  }
+
+  // Transform to match Product interface
+  return (data || []).map((p: any) => ({
+    ...p,
+    brand: p.brands?.name || '',
+    image: p.image_url || '',
+    category: p.categories?.slug || p.category_id || '',
+    compare_price: p.compare_price || undefined,
+  }));
+};
+
+export const getProductById = async (id: string) => {
+  const { data, error } = await supabase
+    .from('products')
+    .select(`
+      *,
+      brands(name),
+      categories(name, slug)
+    `)
+    .eq('id', id)
+    .eq('is_active', true)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to fetch product: ${error.message}`);
+  }
+
+  // Transform to match Product interface
+  return {
+    ...data,
+    brand: (data as any).brands?.name || '',
+    image: data.image_url || '',
+    category: (data as any).categories?.slug || data.category_id || '',
+    compare_price: data.compare_price || undefined,
+  };
+};
+
+export const updateProductStock = async (productId: string, quantity: number) => {
+  // Direct update instead of using non-existent RPC
+  const { data: product } = await supabase
+    .from('products')
+    .select('stock_quantity')
+    .eq('id', productId)
+    .single();
+
+  if (!product) {
+    throw new Error('Product not found');
+  }
+
+  const newQuantity = product.stock_quantity - quantity;
+  
+  if (newQuantity < 0) {
+    throw new Error('Insufficient stock');
+  }
+
+  const { error } = await supabase
+    .from('products')
+    .update({ stock_quantity: newQuantity })
+    .eq('id', productId);
+
+  if (error) {
+    throw new Error(`Failed to update stock: ${error.message}`);
+  }
+
+  return true;
+};
+
+// Order operations
+export const createOrder = async (
+  userId: string,
+  items: CartItem[],
+  totalAmount: number,
+  shippingAddress: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    zip_code: string;
+  }
+) => {
+  try {
+    // Validate items and stock before creating order
+    for (const item of items) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('stock_quantity, is_active')
+        .eq('id', item.product.id)
+        .single();
+
+      if (!product || !product.is_active) {
+        throw new Error(`Product ${item.product.name} is not available`);
+      }
+
+      if (product.stock_quantity < item.quantity) {
+        throw new Error(`Insufficient stock for ${item.product.name}. Available: ${product.stock_quantity}, Requested: ${item.quantity}`);
+      }
+    }
+
+    // Get the city name from the city ID
+    const cityName = await getCityNameById(shippingAddress.city);
+    
+    // Create a new shipping address object with the city name instead of ID
+    const updatedShippingAddress = {
+      ...shippingAddress,
+      city: cityName || shippingAddress.city // Use city name if found, otherwise keep the ID
+    };
+
+    // Calculate order totals based on the passed totalAmount (without taxes)
+    const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+    // Extract shipping cost from the totalAmount (totalAmount = subtotal + shipping)
+    const shippingAmount = totalAmount - subtotal;
+    const taxAmount = 0; // No tax
+    const calculatedTotal = totalAmount; // Use the passed totalAmount directly
+
+    // Create order (order_number is auto-generated by trigger)
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert([{
+        user_id: userId,
+        order_number: '',
+        subtotal,
+        shipping_amount: shippingAmount,
+        tax_amount: taxAmount,
+        discount_amount: 0,
+        total_amount: calculatedTotal,
+        shipping_address: updatedShippingAddress,
+        status: 'pending',
+        payment_status: 'pending',
+      }])
+      .select()
+      .single();
+
+    if (orderError) {
+      throw new Error(`Failed to create order: ${orderError.message}`);
+    }
+
+    // Create order items with total column
+    const orderItems = items.map(item => ({
+      order_id: order.id,
+      product_id: item.product.id,
+      quantity: item.quantity,
+      price: item.product.price,
+      total: item.product.price * item.quantity,
+    }));
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems);
+
+    if (itemsError) {
+      // Rollback order if items creation fails
+      await supabase.from('orders').delete().eq('id', order.id);
+      throw new Error(`Failed to create order items: ${itemsError.message}`);
+    }
+
+    // Update stock quantities
+    for (const item of items) {
+      await updateProductStock(item.product.id, item.quantity);
+    }
+
+    return order;
+  } catch (error) {
+    console.error('Order creation error:', error);
+    throw error;
+  }
+};
+
+export const getOrdersByUserId = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items!fk_order_items_order (
+        *,
+        products!fk_order_items_product (
+          id,
+          name,
+          image_url
+        )
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch orders: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+export const getAllOrders = async () => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (
+        *,
+        products (
+          id,
+          name,
+          image_url
+        )
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch orders: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+export const updateOrderStatus = async (orderId: string, status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
+  const { error } = await supabase
+    .from('orders')
+    .update({ 
+      status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', orderId);
+
+  if (error) {
+    throw new Error(`Failed to update order status: ${error.message}`);
+  }
+};
+
+// Admin operations
+export const createProduct = async (product: any) => {
+  try {
+    // Generate unique slug
+    const slug = await ensureUniqueSlug('products', product.slug || product.name);
+    
+    // Prepare data with correct field mappings
+    const productData = {
+      name: product.name,
+      slug: slug,
+      description: product.description,
+      short_description: product.short_description || product.description?.substring(0, 160),
+      price: product.price,
+      compare_price: product.compare_price,
+      cost_price: product.cost_price,
+      sku: product.sku,
+      stock_quantity: product.stock_quantity || 0,
+      brand_id: product.brand_id,
+      category_id: product.category_id,
+      image_url: product.image_url || product.image,
+      notes: product.notes,
+      size: product.size,
+      is_active: true,
+      featured: product.featured || false,
+    };
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert(productData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase create product error:", error);
+      throw new Error(`Failed to create product: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Create product error:", error);
+    throw error instanceof Error ? error : new Error("Unknown error occurred while creating product");
+  }
+};
+
+export const updateProduct = async (id: string, updates: any) => {
+  try {
+    // Prepare data with correct field mappings
+    const productData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update slug if name or slug is explicitly changed
+    if (updates.name || updates.slug) {
+      const baseForSlug = updates.slug || updates.name;
+      productData.slug = await ensureUniqueSlug('products', baseForSlug, id);
+    }
+
+    if (updates.name) productData.name = updates.name;
+    if (updates.description) productData.description = updates.description;
+    if (updates.short_description) productData.short_description = updates.short_description;
+    if (updates.price !== undefined) productData.price = updates.price;
+    if (updates.compare_price !== undefined) productData.compare_price = updates.compare_price;
+    if (updates.cost_price !== undefined) productData.cost_price = updates.cost_price;
+    if (updates.sku) productData.sku = updates.sku;
+    if (updates.stock_quantity !== undefined) productData.stock_quantity = updates.stock_quantity;
+    if (updates.brand_id) productData.brand_id = updates.brand_id;
+    if (updates.category_id) productData.category_id = updates.category_id;
+    if (updates.image_url || updates.image) productData.image_url = updates.image_url || updates.image;
+    if (updates.notes) productData.notes = updates.notes;
+    if (updates.size) productData.size = updates.size;
+    if (updates.is_active !== undefined) productData.is_active = updates.is_active;
+    if (updates.featured !== undefined) productData.featured = updates.featured;
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(productData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase update product error:", error);
+      throw new Error(`Failed to update product: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Update product error:", error);
+    throw error instanceof Error ? error : new Error("Unknown error occurred while updating product");
+  }
+};
+
+export const deleteProduct = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: false })
+      .eq('id', id);
+
+    if (error) {
+      console.error("Supabase delete product error:", error);
+      throw new Error(`Failed to delete product: ${error.message}`);
+    }
+  } catch (error) {
+    console.error("Delete product error:", error);
+    throw error instanceof Error ? error : new Error("Unknown error occurred while deleting product");
+  }
+};
+
+// Analytics operations
+export const getOrderStats = async () => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('status, total_amount, created_at, user_id');
+
+  if (error) {
+    throw new Error(`Failed to fetch order stats: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+export const getProductStats = async () => {
+  const { data, error } = await supabase
+    .from('order_items')
+    .select(`
+      quantity,
+      price,
+      products!fk_order_items_product (
+        id,
+        name
+      )
+    `);
+
+  if (error) {
+    throw new Error(`Failed to fetch product stats: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+// Review operations
+export const getProductReviews = async (productId: string) => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('product_id', productId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch reviews: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+export const createReview = async (
+  productId: string,
+  userId: string,
+  rating: number,
+  title: string,
+  comment: string,
+  isVerifiedPurchase: boolean = false
+) => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert({
+      product_id: productId,
+      user_id: userId,
+      rating,
+      title,
+      comment,
+      is_verified_purchase: isVerifiedPurchase,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create review: ${error.message}`);
+  }
+
+  return data;
+};
+
+export const updateReview = async (
+  reviewId: string,
+  rating: number,
+  title: string,
+  comment: string
+) => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .update({
+      rating,
+      title,
+      comment,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', reviewId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update review: ${error.message}`);
+  }
+
+  return data;
+};
+
+export const deleteReview = async (reviewId: string) => {
+  const { error } = await supabase
+    .from('reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) {
+    throw new Error(`Failed to delete review: ${error.message}`);
+  }
+};
+
+export const getProductRating = async (productId: string) => {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('rating')
+    .eq('product_id', productId);
+
+  if (error) {
+    throw new Error(`Failed to fetch product rating: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return { average: 0, count: 0 };
+  }
+
+  const average = data.reduce((sum, review) => sum + review.rating, 0) / data.length;
+  return { average: Math.round(average * 10) / 10, count: data.length };
+};
+
+// Wishlist operations (table name is 'wishlists' plural in database)
+export const getWishlist = async (userId: string) => {
+  const { data, error } = await (supabase as any)
+    .from('wishlists')
+    .select(`
+      *,
+      products!fk_wishlists_product (
+        id,
+        name,
+        price,
+        image_url,
+        stock_quantity,
+        is_active
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch wishlist: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+export const addToWishlist = async (userId: string, productId: string) => {
+  const { data, error } = await (supabase as any)
+    .from('wishlists')
+    .insert({
+      user_id: userId,
+      product_id: productId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to add to wishlist: ${error.message}`);
+  }
+
+  return data;
+};
+
+export const removeFromWishlist = async (userId: string, productId: string) => {
+  const { error } = await (supabase as any)
+    .from('wishlists')
+    .delete()
+    .eq('user_id', userId)
+    .eq('product_id', productId);
+
+  if (error) {
+    throw new Error(`Failed to remove from wishlist: ${error.message}`);
+  }
+};
+
+export const isInWishlist = async (userId: string, productId: string) => {
+  const { data, error } = await (supabase as any)
+    .from('wishlists')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('product_id', productId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to check wishlist: ${error.message}`);
+  }
+
+  return !!data;
+};
+
+// Notification operations - COMMENTED OUT: notifications table doesn't exist
+// export const getNotifications = async (userId: string) => {
+//   return [];
+// };
+
+// export const createNotification = async (
+//   userId: string,
+//   type: 'order_update' | 'product_restock' | 'price_drop' | 'wishlist_available',
+//   title: string,
+//   message: string,
+//   data?: Record<string, unknown>
+// ) => {
+//   // Notifications table doesn't exist
+//   return null;
+// };
+
+// export const markNotificationAsRead = async (notificationId: string) => {
+//   // Notifications table doesn't exist
+//   return null;
+// };
+
+// export const markAllNotificationsAsRead = async (userId: string) => {
+//   // Notifications table doesn't exist
+//   return null;
+// };
+
+// Inventory management
+export const updateProductInventory = async (
+  productId: string,
+  stockQuantity: number,
+  isActive: boolean = true
+) => {
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      stock_quantity: stockQuantity,
+      is_active: isActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', productId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update inventory: ${error.message}`);
+  }
+
+  return data;
+};
+
+export const getLowStockProducts = async (threshold: number = 10) => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true)
+    .lte('stock_quantity', threshold)
+    .order('stock_quantity', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch low stock products: ${error.message}`);
+  }
+
+  // Transform to match Product interface
+  return (data || []).map((p: any) => ({
+    ...p,
+    brand: p.brand || '',
+    image: p.image_url || '',
+    category: p.category_id || '',
+  }));
+};
+
+// Advanced search and filtering with price comparison support
+export const searchProducts = async (filters: {
+  search?: string;
+  category?: string;
+  collection?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minRating?: number;
+  inStock?: boolean;
+  sortBy?: 'price' | 'rating' | 'name' | 'created_at';
+  sortOrder?: 'asc' | 'desc';
+}) => {
+  let query = supabase
+    .from('products')
+    .select(`
+      *,
+      brands!products_brand_id_fkey(name),
+      categories!products_category_id_fkey(name, slug),
+      reviews!fk_reviews_product(rating)
+    `)
+    .eq('is_active', true);
+
+  // Search term
+  if (filters.search) {
+    query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%,short_description.ilike.%${filters.search}%`);
+  }
+
+  // Category filter
+  if (filters.category && filters.category !== 'all') {
+    // Get the category ID from the slug
+    const { data: categoryData, error: categoryError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', filters.category)
+      .single();
+    
+    if (categoryError) {
+      throw new Error(`Failed to fetch category: ${categoryError.message}`);
+    }
+    
+    if (categoryData) {
+      query = query.eq('category_id', categoryData.id);
+    }
+  }
+
+  // Collection filter
+  if (filters.collection && filters.collection !== 'all') {
+    // Get the collection ID from the slug
+    const { data: collectionData, error: collectionError } = await supabase
+      .from('collections')
+      .select('id')
+      .eq('slug', filters.collection)
+      .single();
+    
+    if (collectionError) {
+      throw new Error(`Failed to fetch collection: ${collectionError.message}`);
+    }
+    
+    if (collectionData) {
+      // Get product IDs that belong to the specified collection
+      const { data: collectionProducts, error: productCollectionError } = await supabase
+        .from('product_collections')
+        .select('product_id')
+        .eq('collection_id', collectionData.id);
+      
+      if (productCollectionError) {
+        throw new Error(`Failed to fetch collection products: ${productCollectionError.message}`);
+      }
+      
+      const collectionProductIds = collectionProducts.map((item: { product_id: string }) => item.product_id);
+      
+      // If no products in collection, return empty array
+      if (collectionProductIds.length === 0) {
+        return [];
+      }
+      
+      // Filter products by these IDs
+      query = query.in('id', collectionProductIds);
+    }
+  }
+
+  // Price range
+  if (filters.minPrice !== undefined) {
+    query = query.gte('price', filters.minPrice);
+  }
+  if (filters.maxPrice !== undefined) {
+    query = query.lte('price', filters.maxPrice);
+  }
+
+  // Stock filter
+  if (filters.inStock) {
+    query = query.gt('stock_quantity', 0);
+  }
+
+  // Sorting
+  const sortBy = filters.sortBy || 'created_at';
+  const sortOrder = filters.sortOrder || 'desc';
+  query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Failed to search products: ${error.message}`);
+  }
+
+  let products = data || [];
+
+  //Filter by rating (post-query since we need to calculate average)
+  if (filters.minRating) {
+    products = products.filter(product => {
+      if (!product.reviews || product.reviews.length === 0) {
+        return false;
+      }
+      const averageRating = product.reviews.reduce((sum: number, review: { rating: number }) => sum + review.rating, 0) / product.reviews.length;
+      return averageRating >= filters.minRating!;
+    });
+  }
+
+  // Transform to match Product interface
+  return products.map((p: any) => ({
+    ...p,
+    brand: p.brands?.name || '',
+    image: p.image_url || '',
+    category: p.categories?.slug || p.category_id || '',
+    compare_price: p.compare_price !== null ? p.compare_price : undefined,
+  }));
+};
+
+// Get minimum and maximum product prices
+export const getPriceRange = async () => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('price')
+    .eq('is_active', true);
+
+  if (error) {
+    throw new Error(`Failed to fetch price range: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return { minPrice: 0, maxPrice: 0 };
+  }
+
+  const prices = data.map(item => item.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+
+  return { minPrice, maxPrice };
+};
+
+// Get all products (for calculating price range)
+export const getAllProducts = async () => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true);
+
+  if (error) {
+    throw new Error(`Failed to fetch products: ${error.message}`);
+  }
+
+  // Transform to match Product interface
+  return (data || []).map((p: any) => ({
+    ...p,
+    brand: p.brand || '',
+    image: p.image_url || '',
+    category: p.category_id || '',
+    compare_price: p.compare_price !== null ? p.compare_price : undefined,
+  }));
+};
+
+// Contact message operations
+export const insertContactMessage = async (
+  name: string,
+  email: string,
+  subject: string,
+  message: string,
+  phone?: string
+) => {
+  try {
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .insert({
+        name,
+        email,
+        subject,
+        message,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase insert contact message error:", error);
+      throw new Error(`Failed to submit contact message: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Insert contact message error:", error);
+    throw error instanceof Error ? error : new Error("Unknown error occurred while submitting contact message");
+  }
+};
+
+// Get all contact messages (admin only)
+export const getContactMessages = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Supabase get contact messages error:", error);
+      throw new Error(`Failed to fetch contact messages: ${error.message}`);
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("Get contact messages error:", error);
+    throw error instanceof Error ? error : new Error("Unknown error occurred while fetching contact messages");
+  }
+};
+
+// Update contact message (mark as read, respond, etc.)
+export const updateContactMessage = async (
+  id: string,
+  updates: {
+    is_read?: boolean;
+    response?: string;
+    responded_at?: string;
+  }
+) => {
+  try {
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase update contact message error:", error);
+      throw new Error(`Failed to update contact message: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Update contact message error:", error);
+    throw error instanceof Error ? error : new Error("Unknown error occurred while updating contact message");
+  }
+};
+
+// Delete contact message
+export const deleteContactMessage = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('contact_messages')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error("Supabase delete contact message error:", error);
+      throw new Error(`Failed to delete contact message: ${error.message}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Delete contact message error:", error);
+    throw error instanceof Error ? error : new Error("Unknown error occurred while deleting contact message");
+  }
+};
+
+// Categories operations
+export const getCategories = async () => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('is_active', true)
+    .order('display_order', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch categories: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+// Brands operations
+export const getBrands = async () => {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('*')
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch brands: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+// Collections operations
+export const getCollections = async () => {
+  const { data, error } = await supabase
+    .from('collections')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch collections: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+// ============= ASSOCIATION SYNC HELPERS =============
+
+/**
+ * Sync product collections - adds new associations and removes old ones
+ */
+export const syncProductCollections = async (
+  productId: string,
+  collectionIds: string[]
+): Promise<void> => {
+  try {
+    // Get existing collections
+    const { data: existing, error: fetchError } = await supabase
+      .from('product_collections')
+      .select('collection_id')
+      .eq('product_id', productId);
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch existing collections: ${fetchError.message}`);
+    }
+
+    const existingIds = new Set((existing || []).map(item => item.collection_id));
+    const selectedIds = new Set(collectionIds);
+
+    // Determine what to add and what to remove
+    const toAdd = collectionIds.filter(id => !existingIds.has(id));
+    const toRemove = (existing || [])
+      .map(item => item.collection_id)
+      .filter(id => !selectedIds.has(id));
+
+    // Add new associations
+    if (toAdd.length > 0) {
+      const insertData = toAdd.map(collectionId => ({
+        product_id: productId,
+        collection_id: collectionId,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('product_collections')
+        .upsert(insertData, {
+          onConflict: 'product_id,collection_id',
+          ignoreDuplicates: true,
+        });
+
+      if (insertError) {
+        throw new Error(`Failed to add collections: ${insertError.message}`);
+      }
+    }
+
+    // Remove old associations
+    if (collectionIds.length === 0) {
+      // Remove all if none selected
+      const { error: deleteError } = await supabase
+        .from('product_collections')
+        .delete()
+        .eq('product_id', productId);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove all collections: ${deleteError.message}`);
+      }
+    } else if (toRemove.length > 0) {
+      // Remove specific ones
+      const { error: deleteError } = await supabase
+        .from('product_collections')
+        .delete()
+        .eq('product_id', productId)
+        .in('collection_id', toRemove);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove collections: ${deleteError.message}`);
+      }
+    }
+  } catch (error) {
+    console.error("Sync collections error:", error);
+    throw error instanceof Error ? error : new Error("Failed to sync collections");
+  }
+};
+
+/**
+ * Sync product categories - adds new associations and removes old ones
+ */
+export const syncProductCategories = async (
+  productId: string,
+  categoryIds: string[]
+): Promise<void> => {
+  try {
+    // Get existing categories
+    const { data: existing, error: fetchError } = await supabase
+      .from('product_categories')
+      .select('category_id')
+      .eq('product_id', productId);
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch existing categories: ${fetchError.message}`);
+    }
+
+    const existingIds = new Set((existing || []).map(item => item.category_id));
+    const selectedIds = new Set(categoryIds);
+
+    // Determine what to add and what to remove
+    const toAdd = categoryIds.filter(id => !existingIds.has(id));
+    const toRemove = (existing || [])
+      .map(item => item.category_id)
+      .filter(id => !selectedIds.has(id));
+
+    // Add new associations
+    if (toAdd.length > 0) {
+      const insertData = toAdd.map(categoryId => ({
+        product_id: productId,
+        category_id: categoryId,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('product_categories')
+        .upsert(insertData, {
+          onConflict: 'product_id,category_id',
+          ignoreDuplicates: true,
+        });
+
+      if (insertError) {
+        throw new Error(`Failed to add categories: ${insertError.message}`);
+      }
+    }
+
+    // Remove old associations
+    if (categoryIds.length === 0) {
+      // Remove all if none selected
+      const { error: deleteError } = await supabase
+        .from('product_categories')
+        .delete()
+        .eq('product_id', productId);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove all categories: ${deleteError.message}`);
+      }
+    } else if (toRemove.length > 0) {
+      // Remove specific ones
+      const { error: deleteError } = await supabase
+        .from('product_categories')
+        .delete()
+        .eq('product_id', productId)
+        .in('category_id', toRemove);
+
+      if (deleteError) {
+        throw new Error(`Failed to remove categories: ${deleteError.message}`);
+      }
+    }
+  } catch (error) {
+    console.error("Sync categories error:", error);
+    throw error instanceof Error ? error : new Error("Failed to sync categories");
+  }
+};
+
+// Product Collections operations
+export const addProductToCollection = async (productId: string, collectionId: string) => {
+  const { data, error } = await supabase
+    .from('product_collections')
+    .insert({
+      product_id: productId,
+      collection_id: collectionId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to add product to collection: ${error.message}`);
+  }
+
+  return data;
+};
+
+export const removeProductFromCollection = async (productId: string, collectionId: string) => {
+  const { error } = await supabase
+    .from('product_collections')
+    .delete()
+    .eq('product_id', productId)
+    .eq('collection_id', collectionId);
+
+  if (error) {
+    throw new Error(`Failed to remove product from collection: ${error.message}`);
+  }
+};
+
+export const getProductCollections = async (productId: string) => {
+  const { data, error } = await supabase
+    .from('product_collections')
+    .select(`
+      *,
+      collections (
+        id,
+        name,
+        slug
+      )
+    `)
+    .eq('product_id', productId);
+
+  if (error) {
+    throw new Error(`Failed to fetch product collections: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+// Category-related operations (many-to-many via product_categories table)
+export const getProductCategories = async (productId: string) => {
+  const { data, error } = await supabase
+    .from('product_categories')
+    .select('category_id')
+    .eq('product_id', productId);
+
+  if (error) {
+    throw new Error(`Failed to fetch product categories: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+export const addProductToCategory = async (productId: string, categoryId: string) => {
+  const { error } = await supabase
+    .from('product_categories')
+    .insert({ product_id: productId, category_id: categoryId });
+
+  if (error) {
+    throw new Error(`Failed to add product to category: ${error.message}`);
+  }
+};
+
+export const removeProductFromCategory = async (productId: string, categoryId: string) => {
+  const { error } = await supabase
+    .from('product_categories')
+    .delete()
+    .eq('product_id', productId)
+    .eq('category_id', categoryId);
+
+  if (error) {
+    throw new Error(`Failed to remove product from category: ${error.message}`);
+  }
+};
+
+export const getAllCategories = async () => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('display_order', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch all categories: ${error.message}`);
+  }
+
+  return data || [];
+};
+
+export const getCategoryById = async (id: string) => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to fetch category: ${error.message}`);
+  }
+
+  return data;
+};
+
+export const createCategory = async (
+  name: string,
+  slug: string,
+  description?: string,
+  image_url?: string,
+  isActive: boolean = true,
+  displayOrder: number = 0
+) => {
+  try {
+    // Generate unique slug
+    const effectiveSlug = await ensureUniqueSlug('categories', slug || name);
+    
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({
+        name,
+        slug: effectiveSlug,
+        description,
+        image_url,
+        is_active: isActive,
+        display_order: displayOrder,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Create category error:", error);
+      throw new Error(`Failed to create category: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Create category error:", error);
+    throw error instanceof Error ? error : new Error("Failed to create category");
+  }
+};
+
+export const updateCategory = async (
+  id: string,
+  updates: {
+    name?: string;
+    slug?: string;
+    description?: string;
+    image_url?: string;
+    is_active?: boolean;
+    display_order?: number;
+  }
+) => {
+  try {
+    const updateData = { ...updates };
+    
+    // Only update slug if name or slug is explicitly changed
+    if (updates.name || updates.slug) {
+      const baseForSlug = updates.slug || updates.name;
+      if (baseForSlug) {
+        updateData.slug = await ensureUniqueSlug('categories', baseForSlug, id);
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('categories')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Update category error:", error);
+      throw new Error(`Failed to update category: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Update category error:", error);
+    throw error instanceof Error ? error : new Error("Failed to update category");
+  }
+};
+
+export const deleteCategory = async (id: string) => {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to delete category: ${error.message}`);
+  }
+};
+
+// Collection management operations
+export const createCollection = async (
+  name: string,
+  slug: string,
+  description?: string,
+  image?: string,
+  isActive: boolean = true,
+  sortOrder: number = 0
+) => {
+  try {
+    // Generate unique slug
+    const effectiveSlug = await ensureUniqueSlug('collections', slug || name);
+    
+    const { data, error } = await supabase
+      .from('collections')
+      .insert({
+        name,
+        slug: effectiveSlug,
+        description,
+        image,
+        is_active: isActive,
+        sort_order: sortOrder,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Create collection error:", error);
+      throw new Error(`Failed to create collection: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Create collection error:", error);
+    throw error instanceof Error ? error : new Error("Failed to create collection");
+  }
+};
+
+export const updateCollection = async (
+  id: string,
+  updates: {
+    name?: string;
+    slug?: string;
+    description?: string;
+    image?: string;
+    is_active?: boolean;
+    sort_order?: number;
+  }
+) => {
+  try {
+    const updateData = { ...updates };
+    
+    // Only update slug if name or slug is explicitly changed
+    if (updates.name || updates.slug) {
+      const baseForSlug = updates.slug || updates.name;
+      if (baseForSlug) {
+        updateData.slug = await ensureUniqueSlug('collections', baseForSlug, id);
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('collections')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Update collection error:", error);
+      throw new Error(`Failed to update collection: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Update collection error:", error);
+    throw error instanceof Error ? error : new Error("Failed to update collection");
+  }
+};
+
+export const deleteCollection = async (id: string) => {
+  const { error } = await supabase
+    .from('collections')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to delete collection: ${error.message}`);
+  }
+};

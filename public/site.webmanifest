@@ -1,0 +1,32 @@
+{
+  "name": "ANAS FRAGRANCES - Luxury Perfumes",
+  "short_name": "ANAS FRAGRANCES",
+  "description": "Discover our exclusive collection of luxury perfumes and fragrances",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/ANAS-FRAGRANCES.ico",
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/ANAS-FRAGRANCES.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/ANAS-FRAGRANCES.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["shopping", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}
