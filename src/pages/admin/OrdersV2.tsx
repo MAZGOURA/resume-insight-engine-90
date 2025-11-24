@@ -57,15 +57,33 @@ export default function OrdersV2() {
         return;
       }
 
-      // Fetch order items separately
+      // Fetch order items with product data
       const { data: itemsData } = await supabase
         .from("order_items")
-        .select("*");
+        .select(`
+          *,
+          products (
+            id,
+            name,
+            image_url,
+            sku
+          )
+        `);
+
+      // Enrich items with product data
+      const enrichedItems = itemsData?.map(item => ({
+        ...item,
+        product_snapshot: item.products ? {
+          name: (item.products as any).name,
+          image_url: (item.products as any).image_url,
+          sku: (item.products as any).sku
+        } : item.product_snapshot
+      })) || [];
 
       // Combine orders with their items
       const ordersWithItems = ordersData.map(order => ({
         ...order,
-        order_items: itemsData?.filter(item => item.order_id === order.id) || []
+        order_items: enrichedItems.filter(item => item.order_id === order.id)
       }));
 
       setOrders(ordersWithItems);
@@ -126,7 +144,7 @@ export default function OrdersV2() {
       header: "Client",
       accessor: (order: any) => {
         const addr = order.shipping_address as any;
-        return `${addr.first_name} ${addr.last_name}`;
+        return addr.name || `${addr.first_name || ''} ${addr.last_name || ''}`.trim() || 'Client';
       },
     },
     {
@@ -172,13 +190,17 @@ export default function OrdersV2() {
               <Button variant="outline" size="sm" onClick={() => {
                 const csv = [
                   ['N° Commande', 'Client', 'Date', 'Total', 'Statut'].join(','),
-                  ...filteredOrders.map(o => [
-                    o.order_number,
-                    `${(o.shipping_address as any)?.first_name} ${(o.shipping_address as any)?.last_name}`,
-                    format(new Date(o.created_at), 'dd/MM/yyyy'),
-                    o.total_amount,
-                    o.status
-                  ].join(','))
+                  ...filteredOrders.map(o => {
+                    const addr = o.shipping_address as any;
+                    const clientName = addr?.name || `${addr?.first_name || ''} ${addr?.last_name || ''}`.trim() || 'Client';
+                    return [
+                      o.order_number,
+                      clientName,
+                      format(new Date(o.created_at), 'dd/MM/yyyy'),
+                      o.total_amount,
+                      o.status
+                    ].join(',');
+                  })
                 ].join('\n');
                 
                 const blob = new Blob([csv], { type: 'text/csv' });

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info, Package, DollarSign, FileText, Image as ImageIcon, Search, Settings } from "lucide-react";
 
 interface ProductFormModalProps {
   open: boolean;
@@ -209,265 +210,417 @@ export const ProductFormModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {product ? "Modifier le produit" : "Nouveau produit"}
+          <DialogTitle className="text-2xl">
+            {product ? "Modifier le produit" : "Créer un nouveau produit"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nom *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-              />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Section 1: Informations de base */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Informations de base</h3>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="slug">Slug *</Label>
-              <div className="flex gap-2">
+            <Separator />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">
+                  Nom du produit <span className="text-destructive">*</span>
+                </Label>
                 <Input
-                  id="slug"
-                  value={formData.slug}
+                  id="name"
+                  placeholder="Ex: Eau de Parfum Lavande"
+                  value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, slug: e.target.value })
+                    setFormData({ ...formData, name: e.target.value })
                   }
                   required
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={generateSlug}
-                  disabled={!formData.name}
+                <p className="text-xs text-muted-foreground">
+                  Le nom qui sera affiché au client sur le site
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="slug">
+                  Slug (URL) <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="slug"
+                    placeholder="eau-de-parfum-lavande"
+                    value={formData.slug}
+                    onChange={(e) =>
+                      setFormData({ ...formData, slug: e.target.value })
+                    }
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={generateSlug}
+                    disabled={!formData.name}
+                  >
+                    Générer
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  L'URL du produit - généré automatiquement depuis le nom
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category_id">Catégorie</Label>
+                <Select
+                  value={formData.category_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, category_id: value })
+                  }
                 >
-                  Générer
-                </Button>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une catégorie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choisir la catégorie principale du produit
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="brand_id">Marque</Label>
+                <Select
+                  value={formData.brand_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, brand_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une marque" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Sélectionner le fabricant du produit
+                </p>
               </div>
             </div>
+          </div>
 
+          {/* Section 2: Prix et inventaire */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Prix et inventaire</h3>
+            </div>
+            <Separator />
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="price">
+                  Prix de vente (MAD) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  placeholder="299.00"
+                  value={formData.price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, price: e.target.value })
+                  }
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Prix affiché au client sur le site
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="compare_price">Prix de comparaison (MAD)</Label>
+                <Input
+                  id="compare_price"
+                  type="number"
+                  step="0.01"
+                  placeholder="399.00"
+                  value={formData.compare_price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, compare_price: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Prix barré pour afficher une promotion
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cost_price">Prix de revient (MAD)</Label>
+                <Input
+                  id="cost_price"
+                  type="number"
+                  step="0.01"
+                  placeholder="150.00"
+                  value={formData.cost_price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cost_price: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Coût d'achat interne (non visible publiquement)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="stock_quantity">Stock disponible</Label>
+                <Input
+                  id="stock_quantity"
+                  type="number"
+                  placeholder="50"
+                  value={formData.stock_quantity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, stock_quantity: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quantité disponible en stock
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU (Référence)</Label>
+                <Input
+                  id="sku"
+                  placeholder="PARFUM-LAV-100"
+                  value={formData.sku}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sku: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Référence unique du produit pour gestion interne
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="size">Taille / Volume</Label>
+                <Input
+                  id="size"
+                  placeholder="100ml"
+                  value={formData.size}
+                  onChange={(e) =>
+                    setFormData({ ...formData, size: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ex: 50ml, 100ml, 150ml
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Descriptions */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Descriptions</h3>
+            </div>
+            <Separator />
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="short_description">Description courte</Label>
+                <Textarea
+                  id="short_description"
+                  placeholder="Un résumé accrocheur du produit en 1-2 phrases"
+                  value={formData.short_description}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      short_description: e.target.value,
+                    })
+                  }
+                  rows={2}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Résumé visible sur les listes de produits (max 2 lignes)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description complète</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Description détaillée du produit, ses caractéristiques, ses notes de parfum..."
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  rows={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Description détaillée visible sur la page du produit
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Image */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Image</h3>
+            </div>
+            <Separator />
+            
             <div className="space-y-2">
-              <Label htmlFor="price">Prix (MAD) *</Label>
+              <Label htmlFor="image_url">URL de l'image</Label>
               <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={formData.price}
+                id="image_url"
+                placeholder="https://exemple.com/images/produit.jpg"
+                value={formData.image_url}
                 onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
-                }
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="compare_price">Prix de comparaison (MAD)</Label>
-              <Input
-                id="compare_price"
-                type="number"
-                step="0.01"
-                value={formData.compare_price}
-                onChange={(e) =>
-                  setFormData({ ...formData, compare_price: e.target.value })
+                  setFormData({ ...formData, image_url: e.target.value })
                 }
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category_id">Catégorie</Label>
-              <Select
-                value={formData.category_id}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, category_id: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner une catégorie" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="brand_id">Marque</Label>
-              <Select
-                value={formData.brand_id}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, brand_id: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner une marque" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((brand) => (
-                    <SelectItem key={brand.id} value={brand.id}>
-                      {brand.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                value={formData.sku}
-                onChange={(e) =>
-                  setFormData({ ...formData, sku: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="stock_quantity">Stock</Label>
-              <Input
-                id="stock_quantity"
-                type="number"
-                value={formData.stock_quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, stock_quantity: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="size">Taille</Label>
-              <Input
-                id="size"
-                value={formData.size}
-                onChange={(e) =>
-                  setFormData({ ...formData, size: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cost_price">Prix de revient (MAD)</Label>
-              <Input
-                id="cost_price"
-                type="number"
-                step="0.01"
-                value={formData.cost_price}
-                onChange={(e) =>
-                  setFormData({ ...formData, cost_price: e.target.value })
-                }
-              />
+              <p className="text-xs text-muted-foreground">
+                Lien vers l'image principale du produit (format JPG, PNG)
+              </p>
+              {formData.image_url && (
+                <div className="mt-2">
+                  <img
+                    src={formData.image_url}
+                    alt="Aperçu"
+                    className="h-32 w-32 object-cover rounded border"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="image_url">URL de l'image</Label>
-            <Input
-              id="image_url"
-              value={formData.image_url}
-              onChange={(e) =>
-                setFormData({ ...formData, image_url: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="short_description">Description courte</Label>
-            <Textarea
-              id="short_description"
-              value={formData.short_description}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  short_description: e.target.value,
-                })
-              }
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description complète</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              rows={4}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="meta_title">Meta titre (SEO)</Label>
-            <Input
-              id="meta_title"
-              value={formData.meta_title}
-              onChange={(e) =>
-                setFormData({ ...formData, meta_title: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="meta_description">Meta description (SEO)</Label>
-            <Textarea
-              id="meta_description"
-              value={formData.meta_description}
-              onChange={(e) =>
-                setFormData({ ...formData, meta_description: e.target.value })
-              }
-              rows={2}
-            />
-          </div>
-
-          <div className="flex gap-6">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, is_active: checked })
-                }
-              />
-              <Label htmlFor="is_active">Actif</Label>
+          {/* Section 5: SEO */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Référencement (SEO)</h3>
             </div>
+            <Separator />
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="meta_title">Meta titre</Label>
+                <Input
+                  id="meta_title"
+                  placeholder="Eau de Parfum Lavande 100ml | ANAS FRAGRANCES"
+                  value={formData.meta_title}
+                  onChange={(e) =>
+                    setFormData({ ...formData, meta_title: e.target.value })
+                  }
+                  maxLength={60}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Titre affiché dans les résultats Google (max 60 caractères)
+                </p>
+              </div>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="featured"
-                checked={formData.featured}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, featured: checked })
-                }
-              />
-              <Label htmlFor="featured">En vedette</Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="show_compare_price"
-                checked={formData.show_compare_price}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, show_compare_price: checked })
-                }
-              />
-              <Label htmlFor="show_compare_price">
-                Afficher prix de comparaison
-              </Label>
+              <div className="space-y-2">
+                <Label htmlFor="meta_description">Meta description</Label>
+                <Textarea
+                  id="meta_description"
+                  placeholder="Découvrez notre eau de parfum à la lavande, une fragrance élégante et rafraîchissante pour homme et femme."
+                  value={formData.meta_description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, meta_description: e.target.value })
+                  }
+                  rows={2}
+                  maxLength={160}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Description affichée dans Google (max 160 caractères)
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
+          {/* Section 6: Options */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Options</h3>
+            </div>
+            <Separator />
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="is_active"
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, is_active: checked })
+                    }
+                  />
+                  <Label htmlFor="is_active" className="font-semibold">Produit actif</Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-[30px]">
+                  Le produit sera visible et achetable sur le site
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="featured"
+                    checked={formData.featured}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, featured: checked })
+                    }
+                  />
+                  <Label htmlFor="featured" className="font-semibold">En vedette</Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-[30px]">
+                  Afficher dans la section "Produits en vedette"
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show_compare_price"
+                    checked={formData.show_compare_price}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, show_compare_price: checked })
+                    }
+                  />
+                  <Label htmlFor="show_compare_price" className="font-semibold">Montrer prix barré</Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-[30px]">
+                  Afficher le prix de comparaison barré sur le site
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               type="button"
               variant="outline"
@@ -478,7 +631,7 @@ export const ProductFormModal = ({
             </Button>
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {product ? "Modifier" : "Créer"}
+              {product ? "Modifier le produit" : "Créer le produit"}
             </Button>
           </div>
         </form>

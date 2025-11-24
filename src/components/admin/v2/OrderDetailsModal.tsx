@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Package, MapPin, CreditCard, Clock, Printer, Download } from "lucide-react";
+import { Package, MapPin, CreditCard, Clock, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -50,70 +50,119 @@ export const OrderDetailsModal = ({ open, onOpenChange, order, onOrderUpdate }: 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       
-      // Header
-      doc.setFontSize(20);
-      doc.text("FACTURE", pageWidth / 2, 20, { align: "center" });
+      // Header with blue background
+      doc.setFillColor(37, 99, 235); // Blue
+      doc.rect(0, 0, pageWidth, 35, 'F');
+      doc.setTextColor(255, 255, 255); // White text
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.text("ANAS FRAGRANCES", pageWidth / 2, 15, { align: "center" });
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "normal");
+      doc.text("FACTURE", pageWidth / 2, 25, { align: "center" });
       
-      // Order info
-      doc.setFontSize(12);
-      doc.text(`Commande: ${order.order_number}`, 20, 40);
-      doc.text(`Date: ${format(new Date(order.created_at), "d MMMM yyyy", { locale: fr })}`, 20, 48);
-      doc.text(`Statut: ${order.status}`, 20, 56);
+      // Reset text color
+      doc.setTextColor(0, 0, 0);
       
-      // Customer info
-      doc.setFontSize(14);
-      doc.text("Client:", 20, 70);
+      // Order info section
       doc.setFontSize(11);
-      doc.text(`${shippingAddress.first_name} ${shippingAddress.last_name}`, 20, 78);
-      doc.text(`${shippingAddress.email}`, 20, 84);
-      doc.text(`${shippingAddress.phone}`, 20, 90);
-      doc.text(`${shippingAddress.address_line1}`, 20, 96);
+      doc.setFont("helvetica", "bold");
+      doc.text("Informations de commande", 20, 45);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`N° Commande: ${order.order_number}`, 20, 52);
+      doc.text(`Date: ${format(new Date(order.created_at), "d MMMM yyyy", { locale: fr })}`, 20, 58);
+      doc.text(`Statut: ${order.status}`, 20, 64);
+      
+      // Separator line
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 70, pageWidth - 20, 70);
+      
+      // Customer info with gray background
+      doc.setFillColor(245, 245, 245);
+      doc.rect(20, 75, pageWidth - 40, 45, 'F');
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("Client", 25, 82);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const clientName = shippingAddress.name || `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'Client';
+      doc.text(clientName, 25, 90);
+      doc.text(shippingAddress.email || '', 25, 96);
+      doc.text(shippingAddress.phone || '', 25, 102);
+      doc.text(shippingAddress.address_line1 || '', 25, 108);
       if (shippingAddress.address_line2) {
-        doc.text(`${shippingAddress.address_line2}`, 20, 102);
+        doc.text(shippingAddress.address_line2, 25, 114);
       }
-      doc.text(`${shippingAddress.city}, ${shippingAddress.postal_code}`, 20, 108);
       
       // Products table
       let yPos = 130;
-      doc.setFontSize(14);
-      doc.text("Produits:", 20, yPos);
-      yPos += 10;
-      
-      doc.setFontSize(10);
-      doc.text("Produit", 20, yPos);
-      doc.text("Qté", 120, yPos);
-      doc.text("Prix", 145, yPos);
-      doc.text("Total", 170, yPos);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("Produits commandés", 20, yPos);
       yPos += 8;
       
-      order.order_items?.forEach((item: any) => {
-        doc.text(item.product_snapshot?.name || "", 20, yPos, { maxWidth: 95 });
-        doc.text(String(item.quantity), 120, yPos);
-        doc.text(`${item.price} MAD`, 145, yPos);
-        doc.text(`${item.total} MAD`, 170, yPos);
+      // Table header with gray background
+      doc.setFillColor(230, 230, 230);
+      doc.rect(20, yPos - 5, pageWidth - 40, 8, 'F');
+      doc.setFontSize(9);
+      doc.text("Produit", 25, yPos);
+      doc.text("Qté", 125, yPos);
+      doc.text("Prix", 150, yPos);
+      doc.text("Total", 175, yPos);
+      yPos += 8;
+      
+      // Table rows with alternating colors
+      doc.setFont("helvetica", "normal");
+      order.order_items?.forEach((item: any, index: number) => {
+        if (index % 2 === 0) {
+          doc.setFillColor(250, 250, 250);
+          doc.rect(20, yPos - 5, pageWidth - 40, 8, 'F');
+        }
+        doc.text(item.product_snapshot?.name || 'Produit', 25, yPos, { maxWidth: 95 });
+        doc.text(String(item.quantity), 125, yPos);
+        doc.text(`${item.price} MAD`, 150, yPos);
+        doc.text(`${item.total} MAD`, 175, yPos);
         yPos += 8;
       });
       
-      // Summary
+      // Summary section
       yPos += 10;
-      doc.setFontSize(11);
-      doc.text(`Sous-total: ${order.subtotal} MAD`, 120, yPos);
-      yPos += 8;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(120, yPos - 5, pageWidth - 20, yPos - 5);
+      
+      doc.setFontSize(10);
+      doc.text("Sous-total:", 120, yPos);
+      doc.text(`${order.subtotal} MAD`, 175, yPos, { align: "right" });
+      yPos += 6;
+      
       if (order.shipping_amount > 0) {
-        doc.text(`Livraison: ${order.shipping_amount} MAD`, 120, yPos);
-        yPos += 8;
+        doc.text("Livraison:", 120, yPos);
+        doc.text(`${order.shipping_amount} MAD`, 175, yPos, { align: "right" });
+        yPos += 6;
       }
       if (order.tax_amount > 0) {
-        doc.text(`Taxes: ${order.tax_amount} MAD`, 120, yPos);
-        yPos += 8;
+        doc.text("Taxes:", 120, yPos);
+        doc.text(`${order.tax_amount} MAD`, 175, yPos, { align: "right" });
+        yPos += 6;
       }
       if (order.discount_amount > 0) {
-        doc.text(`Réduction: -${order.discount_amount} MAD`, 120, yPos);
-        yPos += 8;
+        doc.setTextColor(34, 197, 94); // Green
+        doc.text("Réduction:", 120, yPos);
+        doc.text(`-${order.discount_amount} MAD`, 175, yPos, { align: "right" });
+        doc.setTextColor(0, 0, 0);
+        yPos += 6;
       }
       
-      doc.setFontSize(14);
-      doc.text(`Total: ${order.total_amount} MAD`, 120, yPos + 5);
+      // Total with green background
+      yPos += 5;
+      doc.setFillColor(34, 197, 94); // Green
+      doc.rect(120, yPos - 6, pageWidth - 140, 10, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("TOTAL:", 125, yPos);
+      doc.text(`${order.total_amount} MAD`, 175, yPos, { align: "right" });
       
       // Save
       doc.save(`facture-${order.order_number}.pdf`);
@@ -132,26 +181,15 @@ export const OrderDetailsModal = ({ open, onOpenChange, order, onOrderUpdate }: 
             <DialogTitle className="text-2xl">
               Commande #{order.order_number}
             </DialogTitle>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2"
-                onClick={() => window.print()}
-              >
-                <Printer className="h-4 w-4" />
-                Imprimer
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2"
-                onClick={generateInvoicePDF}
-              >
-                <Download className="h-4 w-4" />
-                Télécharger
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={generateInvoicePDF}
+            >
+              <Download className="h-4 w-4" />
+              Télécharger Facture
+            </Button>
           </div>
         </DialogHeader>
 
@@ -195,7 +233,7 @@ export const OrderDetailsModal = ({ open, onOpenChange, order, onOrderUpdate }: 
             </h3>
             <div className="bg-muted/50 p-4 rounded-lg space-y-2">
               <p className="font-medium">
-                {shippingAddress.first_name} {shippingAddress.last_name}
+                {shippingAddress.name || `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'Client'}
               </p>
               <p className="text-sm text-muted-foreground">{shippingAddress.email}</p>
               <p className="text-sm text-muted-foreground">{shippingAddress.phone}</p>
