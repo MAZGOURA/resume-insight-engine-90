@@ -35,6 +35,7 @@ export default function DashboardV2() {
   });
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [revenueData, setRevenueData] = useState<Array<{ name: string; value: number }>>([]);
+  const [topProducts, setTopProducts] = useState<Array<{ name: string; ventes: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,6 +76,30 @@ export default function DashboardV2() {
         .from("products")
         .select("*", { count: "exact", head: true });
 
+      // Fetch popular products from order_items
+      const { data: orderItemsData } = await supabase
+        .from("order_items")
+        .select(`
+          product_id,
+          quantity,
+          products (
+            name
+          )
+        `);
+
+      // Calculate product sales
+      const productSales: Record<string, number> = {};
+      orderItemsData?.forEach((item) => {
+        const productName = (item.products as any)?.name || 'Produit inconnu';
+        productSales[productName] = (productSales[productName] || 0) + item.quantity;
+      });
+
+      // Get top 5 products
+      const topProducts = Object.entries(productSales)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([name, ventes]) => ({ name, ventes }));
+
       // Calculate metrics
       const totalRevenue = orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
       const ordersCount = orders?.length || 0;
@@ -99,6 +124,9 @@ export default function DashboardV2() {
         customers: customersCount || 0,
         products: productsCount || 0,
       });
+
+      // Store top products in state
+      setTopProducts(topProducts);
 
       // Create recent activities from real orders
       const recentActivities = orders?.slice(0, 8).map((order) => ({
@@ -257,12 +285,8 @@ export default function DashboardV2() {
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
-                data={[
-                  { name: "Parfum A", ventes: 65 },
-                  { name: "Parfum B", ventes: 59 },
-                  { name: "Parfum C", ventes: 80 },
-                  { name: "Parfum D", ventes: 45 },
-                  { name: "Parfum E", ventes: 56 },
+                data={topProducts.length > 0 ? topProducts : [
+                  { name: "Aucune vente", ventes: 0 }
                 ]}
                 layout="vertical"
               >

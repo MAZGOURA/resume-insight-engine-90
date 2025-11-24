@@ -170,7 +170,7 @@ export default function ProductsV2() {
           <div
             className={
               viewMode === "grid"
-                ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
                 : "space-y-4"
             }
           >
@@ -179,7 +179,7 @@ export default function ProductsV2() {
                 key={product.id}
                 className="overflow-hidden hover:shadow-lg transition-shadow"
               >
-                <div className="aspect-square bg-muted relative">
+                <div className="h-48 bg-muted relative">
                   <img
                     src={product.image_url || "/placeholder.svg"}
                     alt={product.name}
@@ -191,9 +191,9 @@ export default function ProductsV2() {
                     </div>
                   )}
                 </div>
-                <div className="p-4 space-y-3">
+                <div className="p-3 space-y-2">
                   <div>
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                    <h3 className="text-sm font-medium line-clamp-1">{product.name}</h3>
                     <p className="text-sm text-muted-foreground">
                       {product.categories?.name || "Sans catégorie"}
                     </p>
@@ -201,7 +201,7 @@ export default function ProductsV2() {
                   
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-lg font-bold">{product.price} MAD</p>
+                      <p className="text-base font-bold">{product.price} MAD</p>
                       {product.stock_quantity !== null && (
                         <p className="text-xs text-muted-foreground">
                           Stock: {product.stock_quantity}
