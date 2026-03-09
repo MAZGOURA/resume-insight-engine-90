@@ -7,7 +7,6 @@ Une application e-commerce moderne pour la vente de parfums de luxe, construite 
 ANAS FRAGRANCES est une boutique en ligne spécialisée dans la vente de parfums de luxe pour hommes, femmes et unisexes. L'application offre une expérience d'achat complète avec des fonctionnalités d'administration robustes.
 
 ### Fonctionnalités Principales
-
 - **Catalogue de Produits** : Navigation et recherche avancée de parfums
 - **Panier et Commande** : Processus d'achat simplifié avec validation en temps réel
 - **Gestion des Utilisateurs** : Authentification, profils et historique des commandes
